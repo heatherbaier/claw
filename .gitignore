@@ -1,0 +1,12 @@
+imagery
+archive
+geo*
+.ipynb*
+__pycache__
+*.png
+ex.ipynb
+reinforcement_q_learning copy.ipynb
+reinforcement_q_learning.ipynb
+scrap.ipynb
+test.ipynb
+.DS_Store
