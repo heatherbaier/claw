@@ -11,11 +11,20 @@ import time
 
 import matplotlib.patches as patches
 
-from model import *
+from models import *
 
 from torchvision import models, transforms
 
 from collections import namedtuple, deque
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+import math
+
+from copy import deepcopy
 
 font = cv2.FONT_HERSHEY_COMPLEX_SMALL 
 
@@ -102,10 +111,6 @@ Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
 
 
-rnn = nn.LSTM(10, 20, 2)
-
-
-
 class EarthObs(Env):
 
     def __init__(self, num_channels, num_actions):
@@ -144,10 +149,14 @@ class EarthObs(Env):
         # self.optimizer = torch.optim.Adam(self.actor.parameters(), lr = 0.01)
         # self.criterion = torch.nn.L1Loss()
 
-        self.critic = models.resnet18()
+        self.critic = mig_model(models.resnet18(pretrained = True))
         self.critic.fc = torch.nn.Linear(512, 1)
         self.mig_optim = torch.optim.Adam(self.critic.parameters(), lr = 0.01)
-        self.mig_criterion = torch.nn.L1Loss()        
+        self.mig_criterion = torch.nn.L1Loss()     
+
+        self.rnn = lstm()
+        self.rnn_optim = torch.optim.Adam(self.rnn.parameters(), lr = 0.01)
+        self.rnn_criterion = torch.nn.L1Loss()   
 
         self.to_tens = transforms.ToTensor()
 
@@ -159,8 +168,7 @@ class EarthObs(Env):
 
         self.device = "cpu"
 
-        self.mig_preds = []
-
+        self.error = 0
 
     def optimize_model(self):
 
@@ -238,10 +246,10 @@ class EarthObs(Env):
                 # t.max(1) will return largest column value of each row.
                 # second column on max result is index of where max element was
                 # found, so we pick action with the larger expected reward.
-                print("Computed action!")
+                print("Computed action!", eps_threshold)
                 return policy_net(state).max(1)[1].view(1, 1)
         else:
-            print("Random action!")
+            print("Random action! Epsilon = ", eps_threshold)
             return torch.tensor([[random.randrange(self.n_actions)]], device = self.device, dtype=torch.long)
             
 
@@ -250,32 +258,32 @@ class EarthObs(Env):
         return self.view_box.clip_image(cv2.imread("./test_image.png"))
 
 
-    def draw_elements_on_canvas(self):
+    def draw_elements_on_canvas(self, red = False):
 
         self.canvas = cv2.imread("./test_image.png")
-        
-        # Using cv2.rectangle() method
-        # Draw a rectangle with blue line borders of thickness of 2 px
-        self.canvas = cv2.rectangle(self.canvas, self.view_box.start_point, self.view_box.end_point, self.view_box.color, self.view_box.thickness)        
 
-        text = 'Grabs Left: {} | Current Prediction:  | Land Cover %: {}'.format(self.grabs_left, self.ep_return)
+        if not red:
+            self.canvas = cv2.rectangle(self.canvas, self.view_box.start_point, self.view_box.end_point, self.view_box.color, self.view_box.thickness)        
+        else:
+            self.canvas = cv2.rectangle(self.canvas, self.view_box.start_point, self.view_box.end_point, (0,255,0), self.view_box.thickness)        
+
+        text = ['Grabs Left: {}'.format(self.grabs_left), "Current Prediction: {} migrants".format(int(self.mig_pred)), "Current Error: {} migrants".format(int(self.error)), "Land Cover %: {}".format(0)]
+        locs = [(50,50), (50,100), (50,150)]
 
         # put the info on the canvas
-        self.canvas = cv2.putText(self.canvas, text, (50,50), font,  
-                1.5, (255, 255, 255), 1, cv2.LINE_AA)
+        for i in zip(text, locs):
+            self.canvas = cv2.putText(self.canvas, i[0], i[1], font,  
+                    1.5, (255, 255, 255), 1, cv2.LINE_AA)
 
     def reset(self):
 
         # reset the fuel consumed
         self.grabs_left = self.max_grabs
 
-        # reset the reward
-        self.ep_return = 0
+        self.first_grab = True
+        self.mig_pred = torch.tensor([0])
 
-        # number of birds
-        self.bird_count = 0
-        self.fuel_count = 0
-
+        # Reset the viewbox to its inital position
         self.view_box = ViewBox(self.observation_shape)
 
         # reset the canvas
@@ -306,70 +314,144 @@ class EarthObs(Env):
 
     def step(self, action):
 
-        if action == 4:
-            self.grabs_left -= 1
-            self.sequence_preds = []
-            self.update_mig_weights()
-            self.mig_preds = []
-            
-
-        if self.grabs_left == 0:
-            self.draw_elements_on_canvas()
-            done = True
-            return [1,2,done,4]
-
-        # Flag that marks the termination of an episode
-        done = False
-        
-        # Assert that it is a valid action 
+        # Assert that the action is valid
         assert self.action_space.contains(action), "Invalid Action"
 
-        # Get the screen & the prediction for the current state before you take an action
-        current_screen = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
-        mig_pred_t1 = self.critic(current_screen)
-        self.update_mig_weights(val = mig_pred_t1)
-        # self.mig_preds.append(mig_pred_t1)
+        # Flag that marks the termination of an episode
+        done = False        
 
-        
+        if action == 4:
 
-        # Now take the action and update the view_boxes position (and therefore our state)
-        self.view_box.move_box(action)
+            print("ACTION IS 4 SO SELECTING!")
 
-        # Draw pretty
-        self.draw_elements_on_canvas()
-        time.sleep(.5)
+            self.grabs_left -= 1
 
-        # Get the screen & the prediction for the current state before you take an action
-        new_screen = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
-        mig_pred_t2 = self.critic(new_screen)
-        self.update_mig_weights(val = mig_pred_t2)
-        # self.mig_preds.append(mig_pred_t2)
+            # print("GRAB NUMBER: ", self.max_grabs - self.grabs_left)
 
-        # If the screen after the action was taken is closer to the true value than before,
-        # give the model a reward
-        if abs(self.y_val - mig_pred_t1) > abs(self.y_val - mig_pred_t2):
-            reward = 10
-        else:
-            reward = 0
+            self.view_box.move_box(action)
+
+            # Get the new screen and extract the landsat from that area
+            new_screen = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
+            
+            # Runthe features through the feature extractor to get the FC layer of shape [1,512], then unsqueeze to [1,1,512]
+            fc_layer, _ = self.critic(new_screen)
+            print("CRITIC PREDICTION: ", _.item())
+            fc_layer = fc_layer.unsqueeze(0)
+
+            # print("FULLY CONNECTED LAYER SHAPE: ", fc_layer.shape)
+
+            # Save the previous prediction so we can use it to calculate the reward
+            prev_pred = self.mig_pred
+
+            # If it's the first grab, don't use the hidden layers (but calculate them)
+            if self.first_grab:
+                mig_pred, self.hidden = self.rnn(fc_layer)
+
+            # If it's not the first grab, then use the hidden layers
+            else:
+                mig_pred, self.hiddden = self.rnn(fc_layer, self.hidden)
+
+            # self.hidden = tuple([each.data for each in self.hidden])
+
+            print("RNN MIG PRED: ", mig_pred, self.y_val)
+
+            self.error = self.y_val - mig_pred
+
+            # Calculate the loss and ~optimize~
+            rnn_loss = self.rnn_criterion(mig_pred.squeeze(0), self.y_val)
+            rnn_loss.backward()
+            self.rnn_optim.step()
+            self.rnn_optim.zero_grad() 
+
+            self.draw_elements_on_canvas(red = True)
+     
+            if self.grabs_left == 0:
+
+                self.first_grab = True
+                self.draw_elements_on_canvas()
+                done = True
+
+                self.mig_pred = 0
+                self.error = 0
+
+                return [1,2,done,4]
+
+            else:
+
+                # rnn_loss.backward(retain_graph=True)
+
+                self.mig_pred = mig_pred.item()
+
+                print("OVERALL MIG PRED: ", self.mig_pred)
+
+                # reward = prev_pred
+
+                if abs(self.y_val - prev_pred) > abs(self.y_val - self.mig_pred):
+                    reward = 20
+                else:
+                    reward = 0
+                
+                self.first_grab = False
+
+                return [1,2,done,4]
 
 
-        print("t1 pred: ", mig_pred_t1.item(), "  |  t2 pred: ", mig_pred_t2.item(), "  |  reward: ", reward.item())
-
-        return [1,reward,done,4]
+                
 
 
-    def update_mig_weights(self, val = None):
+        if action != 4:
 
-        if val is not None:
+
+            # Get the screen & the prediction for the current state before you take an action
+            current_screen = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
+            _, mig_pred_t1 = self.critic(current_screen)
+
+            # self.update_mig_weights(val = mig_pred_t1)
+            
+            # Now take the action and update the view_boxes position (and therefore our state)
+            self.view_box.move_box(action)
+
+            # Draw pretty
+            self.draw_elements_on_canvas()
+            # time.sleep(.5)
+
+            # Get the screen & the prediction for the current state before you take an action
+            new_screen = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
+            _, mig_pred_t2 = self.critic(new_screen)
+            
+            # self.update_mig_weights(val = mig_pred_t2, send = True)
+            # self.mig_preds.append(mig_pred_t2)
+
+            # If the screen after the action was taken is closer to the true value than before,
+            # give the model a reward
+            if abs(self.y_val - mig_pred_t1) > abs(self.y_val - mig_pred_t2):
+                reward = 10
+            else:
+                reward = 0
+
+
+            # print("t1 pred: ", mig_pred_t1, "  |  t2 pred: ", mig_pred_t2, "  |  reward: ", reward)
+
+            return [1,reward,done,4]
+
+
+    def update_mig_weights(self, val = None, send = False):
+
+        if not send:
 
             mig_loss = self.mig_criterion(val, self.y_val)
-            print("Migration Loss: ", mig_loss.item())
+            # print("Migration Loss: ", mig_loss.item())
             mig_loss.backward()
 
         else:
 
+            mig_loss = self.mig_criterion(val, self.y_val)
+            # print("Migration Loss: ", mig_loss.item())
+            mig_loss.backward()
             self.mig_optim.step()
-            self.mig_optim.zero_grad()
+            self.mig_optim.zero_grad()            
+
+
 
         # for i in self.mig_preds:
 

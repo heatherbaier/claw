@@ -4,7 +4,7 @@ geo*
 .ipynb*
 __pycache__
 *.png
-ex.ipynb
+*.ipynb
 reinforcement_q_learning copy.ipynb
 reinforcement_q_learning.ipynb
 scrap.ipynb
