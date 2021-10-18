@@ -1,3 +1,4 @@
+import random
 import torch
 import cv2 
 
@@ -23,8 +24,8 @@ class ViewBox(object):
         # SELF.X = WIDTH; SELF.Y = HEIGHT
 
         self.obs_shp = obs_shp
-        self.x = int(self.obs_shp[1] / 2)
-        self.y = int(self.obs_shp[0] / 2)
+        # self.x = int(self.obs_shp[1] / 2)
+        # self.y = int(self.obs_shp[0] / 2)
         self.color = (255, 0, 0) # Blue color in BGR
         self.thickness = 2 # Line thickness of 2 px
         self.radius = radius
@@ -34,6 +35,9 @@ class ViewBox(object):
         self.x_max = int(self.obs_shp[1] - self.radius)
         self.y_min = int(self.radius)
         self.y_max = int(self.obs_shp[0] - self.radius)
+
+        self.x = random.randint(self.x_min, self.x_max)
+        self.y = random.randint(self.y_min, self.y_max)
 
 
     def get_position(self):

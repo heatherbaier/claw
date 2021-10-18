@@ -220,7 +220,7 @@ class EarthObs(Env):
             self.canvas = cv2.rectangle(self.canvas, self.view_box.start_point, self.view_box.end_point, (0,255,0), self.view_box.thickness)        
 
         # Set up a list of text variables and their screen locations
-        text = ["Epoch: {}".format(self.epoch), 'Grabs Left: {}'.format(self.grabs_left), "Current Prediction: {} migrants".format(int(self.mig_pred)), "Current Error: {} migrants".format(int(self.error)), "Epsilon: {}".format(self.eps_threshold), "Land Cover %: {}".format(0)]
+        text = ["Epoch: {}".format(self.epoch), 'Grabs Left: {}'.format(self.grabs_left), "Current Prediction: {} migrants".format(int(self.mig_pred)), "Current Error: {} migrants".format(int(self.error)), "Epsilon: {}".format(round(self.eps_threshold, 2)), "Land Cover %: {}".format(0)]
         locs = [(50,50), (50,90), (50,130), (50,170), (50,210)]
 
         # Then interate over the lists and put the information on the canvas
@@ -234,7 +234,7 @@ class EarthObs(Env):
         self.canvas = np.zeros((self.observation_shape[0], self.observation_shape[1], 3))
 
         # Set up a list of text variables summarizing the Epoch and their screen locations
-        text = ["Epoch: {}".format(self.epoch), "Epoch Predicted # Migrants: {}".format(int(self.mig_pred)), "Epoch Total Error: {} migrants".format(int(self.error)), "Epsilon: {}".format(self.eps_threshold), "Land Cover %: {}".format(0)]
+        text = ["Epoch: {}".format(self.epoch), "Epoch Predicted # Migrants: {}".format(int(self.mig_pred)), "Epoch Total Error: {} migrants".format(int(self.error)), "Epsilon: {}".format(round(self.eps_threshold, 2)), "Land Cover %: {}".format(0)]
         locs = [(50,50), (50,90), (50,130), (50,170), (50,210)]
 
         # Then interate over the lists and put the information on the canvas

@@ -3,7 +3,6 @@ archive
 geo*
 .ipynb*
 __pycache__
-*.png
 *.ipynb
 reinforcement_q_learning copy.ipynb
 reinforcement_q_learning.ipynb
