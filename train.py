@@ -1,3 +1,4 @@
+from torchvision import models, transforms
 import torch
 import cv2 
 
@@ -8,6 +9,8 @@ from models import *
 font = cv2.FONT_HERSHEY_COMPLEX_SMALL 
 torch.autograd.set_detect_anomaly(True)
 
+
+to_tens = transforms.ToTensor()
 
 env = EarthObs(num_channels = 3, num_actions = 5)
 
@@ -20,7 +23,7 @@ for epoch in range(0, 10):
     current_screen = env.view_box.clip_image(cv2.imread("./test_image.png"))
 
     # Reset the ReplayMemory (LOOK INTO THIS)
-    memory = ReplayMemory(10000)
+    # memory = ReplayMemory(10000)
 
     # Set done flag
     done = False
@@ -41,7 +44,7 @@ for epoch in range(0, 10):
         next_state = env.view_box.clip_image(cv2.imread("./test_image.png"))
 
         # Push all of this goodness to memory
-        memory.push(current_state, action, next_state, reward)
+        memory.push(to_tens(current_state).unsqueeze(0), action, to_tens(next_state).unsqueeze(0), torch.tensor([reward]))
 
         # Put it on da screen
         env.render()

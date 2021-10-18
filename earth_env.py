@@ -32,7 +32,7 @@ class ReplayMemory(object):
         return len(self.memory)
 
 
-n_actions = 4
+n_actions = 5
 device = "cpu"
 
 policy_net = DQN(128, 128, n_actions).to(device)
@@ -99,7 +99,7 @@ class EarthObs(Env):
         self.device = "cpu"
         self.eps_threshold = .9
         self.epoch = 0
-        self.BATCH_SIZE = 1
+        self.BATCH_SIZE = 4
         self.GAMMA = 0.999
         self.EPS_START = .9
         self.EPS_END = 0.05
@@ -119,14 +119,11 @@ class EarthObs(Env):
             return
 
         transitions = memory.sample(self.BATCH_SIZE)
-        # print("transitions: ", transitions)
 
         # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
         # detailed explanation). This converts batch-array of Transitions
         # to Transition of batch-arrays.
         batch = Transition(*zip(*transitions))
-
-        print("Batch: ", batch)
 
         # Compute a mask of non-final states and concatenate the batch elements
         # (a final state would've been the one after which simulation ended)
@@ -139,15 +136,13 @@ class EarthObs(Env):
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
 
-        print("action_batch: ", action_batch)
-        print("reward_batch: ", reward_batch)
-
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
         # for each batch state according to policy_net
-        state_action_values = policy_net(state_batch).gather(1, action_batch)
 
-        print("state_action_values: ", state_action_values)
+        pnet_val, _ = policy_net(state_batch)
+
+        state_action_values = pnet_val.gather(1, action_batch)
 
         # Compute V(s_{t+1}) for all next states.
         # Expected values of actions for non_final_next_states are computed based
@@ -155,9 +150,11 @@ class EarthObs(Env):
         # This is merged based on the mask, such that we'll have either the expected
         # state value or 0 in case the state was final.
         next_state_values = torch.zeros(self.BATCH_SIZE, device=device)
-        next_state_values[non_final_mask] = target_net(non_final_next_states).max(1)[0].detach()
+        tnet_val, _ = target_net(non_final_next_states)
+        next_state_values[non_final_mask] = tnet_val.max(1)[0].detach()
+        
         # Compute the expected Q values
-        expected_state_action_values = (next_state_values * SELF.GAMMA) + reward_batch
+        expected_state_action_values = (next_state_values * self.GAMMA) + reward_batch
 
         # Compute Huber loss
         criterion = nn.SmoothL1Loss()
@@ -166,8 +163,8 @@ class EarthObs(Env):
         # Optimize the model
         optimizer.zero_grad()
         loss.backward()
-        for param in policy_net.parameters():
-            param.grad.data.clamp_(-1, 1)
+        # for param in policy_net.parameters():
+        #     param.grad.clamp_(-1, 1)
         optimizer.step()
 
 
@@ -196,7 +193,7 @@ class EarthObs(Env):
                 # second column on max result is index of where max element was
                 # found, so we pick action with the larger expected reward.
                 print("Computed action!", self.eps_threshold)
-                return policy_net(state).max(1)[1].view(1, 1)
+                return policy_net(state)[0].max(1)[1].view(1, 1)
 
         # Otherwise, pick a random action
         else:
@@ -278,12 +275,14 @@ class EarthObs(Env):
         elif mode == "rgb_array":
             return self.canvas
 
+
     def get_action_meanings(self):
         """
         Dictionary of action meanings
         """
         return {0: "Right", 1: "Left", 2: "Down", 3: "Up", 4: "Select"}
     
+
     def close(self):
         """
         Destroys the interactive window
@@ -370,8 +369,6 @@ class EarthObs(Env):
                 self.first_grab = False
 
                 return [1,2,done,4]
-
-
                 
 
         # If the action is just a simple move...
@@ -382,7 +379,9 @@ class EarthObs(Env):
 
             # Get the screen & the prediction for the current state before you take an action
             current_screen = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
-            _, mig_pred_t1 = self.critic(current_screen)
+            _, mig_pred_t1 = policy_net(current_screen)
+
+            self.update_mig_weights(mig_pred_t1)
             
             # Now take the action and update the view_boxes position (and therefore our state)
             self.view_box.move_box(action)
@@ -392,29 +391,27 @@ class EarthObs(Env):
 
             # Get the screen & the prediction for the current state before you take an action
             new_screen = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
-            _, mig_pred_t2 = self.critic(new_screen)
+            _, mig_pred_t2 = policy_net(new_screen)
 
+            self.update_mig_weights(mig_pred_t2)
+            
             # If the screen after the action was taken is closer to the true value than before, give the model a reward
             if abs(self.y_val - mig_pred_t1) > abs(self.y_val - mig_pred_t2):
                 reward = 10
             else:
                 reward = 0
 
+
             return [1,reward,done,4]
 
 
-    def update_mig_weights(self, val = None, send = False):
+    def update_mig_weights(self, val):
 
-        if not send:
+        mig_loss = self.mig_criterion(val, self.y_val)
+        # Optimize the model
+        optimizer.zero_grad()
+        mig_loss.backward()
+        # for param in policy_net.parameters():
+        #     param.grad.clamp_(-1, 1)
+        optimizer.step() 
 
-            mig_loss = self.mig_criterion(val, self.y_val)
-            # print("Migration Loss: ", mig_loss.item())
-            mig_loss.backward()
-
-        else:
-
-            mig_loss = self.mig_criterion(val, self.y_val)
-            # print("Migration Loss: ", mig_loss.item())
-            mig_loss.backward()
-            self.mig_optim.step()
-            self.mig_optim.zero_grad()            
