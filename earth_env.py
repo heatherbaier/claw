@@ -54,7 +54,7 @@ class EarthObs(Env):
         """ define obervation and action spaces in here"""
 
         # define a 2-d observation space
-        self.observation_shape = (953, 1240, 3)
+        self.observation_shape = (953, 1240, 3) # (H, W, C)
         self.obseervation_space = spaces.Box(low = np.zeros(self.observation_shape), 
                                              high = np.ones(self.observation_shape),
                                              dtype = np.float16)
@@ -310,7 +310,7 @@ class EarthObs(Env):
             self.grabs_left -= 1
 
             # Move the box according to the action
-            self.view_box.move_box(action)
+            # self.view_box.move_box(action)
 
             # Get the new screen and extract the landsat from that area
             new_screen = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
@@ -418,5 +418,3 @@ class EarthObs(Env):
             mig_loss.backward()
             self.mig_optim.step()
             self.mig_optim.zero_grad()            
-
-
