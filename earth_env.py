@@ -1,12 +1,6 @@
 from torchvision import models, transforms
 from collections import namedtuple, deque
-import matplotlib.patches as patches
-import torch.nn.functional as F
-import matplotlib.pyplot as plt
 from gym import Env, spaces
-import PIL.Image as Image
-from copy import deepcopy
-import rasterio as rio
 import torch.nn as nn
 import numpy as np 
 import random
@@ -14,7 +8,6 @@ import torch
 import time
 import math
 import cv2 
-import gym
 
 from ViewBox import *
 from models import *
