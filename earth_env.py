@@ -299,9 +299,6 @@ class EarthObs(Env):
             # Update the number of selects left
             self.grabs_left -= 1
 
-            # Move the box according to the action
-            # self.view_box.move_box(action)
-
             # Get the new screen and extract the landsat from that area
             new_screen = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
             
