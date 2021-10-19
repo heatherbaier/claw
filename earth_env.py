@@ -40,7 +40,8 @@ target_net = DQN(128, 128, n_actions).to(device)
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 
-optimizer = torch.optim.RMSprop(policy_net.parameters())
+# optimizer = torch.optim.RMSprop(policy_net.parameters())
+optimizer = torch.optim.Adam(policy_net.parameters(), lr = 0.01)
 memory = ReplayMemory(10000)
 
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
@@ -249,6 +250,7 @@ class EarthObs(Env):
         self.error = 0
         self.epoch = epoch
         self.grabs_left = self.max_grabs
+        self.grab_vectors = []
 
         # Reset the viewbox to its inital position
         self.view_box = ViewBox(self.observation_shape)
@@ -314,37 +316,34 @@ class EarthObs(Env):
             # Get the new screen and extract the landsat from that area
             new_screen = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
             
-            # Run the features through the feature extractor to get the FC layer of shape [1,512], then unsqueeze it to [1,1,512]
-            fc_layer, _ = self.critic(new_screen)
-            print("CRITIC PREDICTION: ", _.item())
-            fc_layer = fc_layer.unsqueeze(0)
+            if len(self.grab_vectors) == 0:
+                _, mig_pred, fc_layer = policy_net(new_screen, seq = None, select = True)
+            else:
+                seq = torch.cat(self.grab_vectors, dim = 1)
+                print("SEQUENCE SHAPE: ", seq.shape)
+                _, mig_pred, fc_layer = policy_net(new_screen, seq = seq, select = True)
+
+            self.grab_vectors.append(fc_layer.detach())
+
+            # if self.grabs_left == 0:
+
+            # print("LAST GRAB SO OPTIMIZING RNN!")
+            # Calculate the loss and ~optimize~
+            # DON'T RUN THIS UNTIL THE SEQUENCE IS DONE (I.E. UNTIL NUM_GRABS_LEFT = 0)
+            mig_loss = self.mig_criterion(mig_pred, self.y_val)
+            optimizer.zero_grad()
+            mig_loss.backward()
+            optimizer.step() 
 
             # Save the previous prediction of the LSTM so we can use it to calculate the reward
             prev_pred = self.mig_pred
-
-            # If it's the first grab, don't use the hidden layers (but calculate them)
-            if self.first_grab:
-                mig_pred, self.hidden = self.rnn(fc_layer)
-
-            # If it's not the first grab, then use the hidden layers
-            else:
-                mig_pred, self.hiddden = self.rnn(fc_layer, self.hidden)
-
-            # self.hidden = tuple([each.data for each in self.hidden])
 
             print("RNN MIG PRED: ", mig_pred, self.y_val)
 
             # Update the new error
             self.error = mig_pred - self.y_val
 
-            # Calculate the loss and ~optimize~
-            # YEAH THIS DEF ALL NEEDS TO BE UPDATED/FIXED
-            rnn_loss = self.rnn_criterion(mig_pred.squeeze(0), self.y_val)
-            rnn_loss.backward()
-            self.rnn_optim.step()
-            self.rnn_optim.zero_grad() 
-
-            # De-tensorize lol
+            # De-tensorize (lol words)
             self.mig_pred = mig_pred.item()
 
             # Update the canvas, but draw the box as green since it was a select
@@ -352,6 +351,7 @@ class EarthObs(Env):
      
             # If there are no grabs left, update the canvas with this steps results, set the done flag to True & return 
             if self.grabs_left == 0:
+
                 self.draw_elements_on_canvas()
                 done = True
                 return [1,2,done,4]
@@ -379,7 +379,13 @@ class EarthObs(Env):
 
             # Get the screen & the prediction for the current state before you take an action
             current_screen = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
-            _, mig_pred_t1 = policy_net(current_screen)
+            # _, mig_pred_t1 = policy_net(current_screen)
+
+            if len(self.grab_vectors) == 0:
+                _, mig_pred_t1 = policy_net(current_screen, seq = None)
+            else:
+                seq = torch.cat(self.grab_vectors, dim = 1)
+                _, mig_pred_t1 = policy_net(current_screen, seq = seq)
 
             self.update_mig_weights(mig_pred_t1)
             
@@ -391,10 +397,15 @@ class EarthObs(Env):
 
             # Get the screen & the prediction for the current state before you take an action
             new_screen = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
-            _, mig_pred_t2 = policy_net(new_screen)
+
+            if len(self.grab_vectors) == 0:
+                _, mig_pred_t2 = policy_net(current_screen, seq = None)
+            else:
+                seq = torch.cat(self.grab_vectors, dim = 1)
+                _, mig_pred_t2 = policy_net(current_screen, seq = seq)
 
             self.update_mig_weights(mig_pred_t2)
-            
+
             # If the screen after the action was taken is closer to the true value than before, give the model a reward
             if abs(self.y_val - mig_pred_t1) > abs(self.y_val - mig_pred_t2):
                 reward = 10
@@ -406,12 +417,8 @@ class EarthObs(Env):
 
 
     def update_mig_weights(self, val):
-
         mig_loss = self.mig_criterion(val, self.y_val)
-        # Optimize the model
         optimizer.zero_grad()
         mig_loss.backward()
-        # for param in policy_net.parameters():
-        #     param.grad.clamp_(-1, 1)
         optimizer.step() 
 

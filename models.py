@@ -26,92 +26,29 @@ class DQN(nn.Module):
         linear_input_size = convw * convh * 32
         self.head = nn.Linear(linear_input_size, outputs)
         self.mig_head = nn.Linear(linear_input_size, 1)
+        self.rnn = torch.nn.LSTM(input_size = linear_input_size, hidden_size = 256, num_layers = 1, batch_first = True)
+        self.fc = torch.nn.Linear(256, 1)
+
 
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
-    def forward(self, x):
+    def forward(self, x, seq = None, select = False):
+        
         x = x.to(device)
         x = F.relu(self.bn1(self.conv1(x)))
         x = F.relu(self.bn2(self.conv2(x)))
         x = F.relu(self.bn3(self.conv3(x)))
-        return self.head(x.view(x.size(0), -1)), self.mig_head(x.view(x.size(0), -1))
 
-
-
-class mig_model(torch.nn.Module):
-
-    def __init__(self, resnet):
-        super().__init__()
-        self.conv1 = resnet.conv1
-        self.bn1 = resnet.bn1
-        self.relu = resnet.relu
-        self.maxpool = resnet.maxpool
-        self.layer1 = resnet.layer1
-        self.layer2 = resnet.layer2
-        self.layer3 = resnet.layer3
-        self.layer4 = resnet.layer4
-        self.avgpool = resnet.avgpool
-        self.fc = torch.nn.Linear(in_features = 512, out_features = 1, bias = True)
-
-    def forward(self, x):
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-        out = self.maxpool(out)
-        out = self.layer1(out)
-        out = self.layer2(out)
-        out = self.layer3(out)
-        out = self.layer4(out)
-        out = self.avgpool(out)
-        out = out.flatten(start_dim=1)
-        pred = self.fc(out)
-        return out, pred
-
-
-
-
-class lstm(torch.nn.Module):
-
-    def __init__(self):
-        super().__init__() 
-        # self.rnn = torch.nn.LSTM(input_size = 512, hidden_size = 256, num_layers = 2, batch_first = True)
-        
-        self.fca = torch.nn.Linear(1024, 512)
-        self.fcb = torch.nn.Linear(512, 256)
-        self.fc1 = torch.nn.Linear(256, 128)
-        self.fc2 = torch.nn.Linear(128, 64)
-        self.fc3 = torch.nn.Linear(64, 32)
-        self.fc4 = torch.nn.Linear(32, 1)
-        self.relu = torch.nn.ReLU()
-
-    def forward(self, x, hidden = None):
-        
-        # print(torch.cat((x, torch.zeros(1, 1, 512)), dim = 2).shape)
-        if hidden is None:
-            out = self.fca(torch.cat((x, torch.zeros(1, 1, 512)), dim = 2))
-            hidden = out.detach().clone()
+        if seq is not None:
+            seq = torch.cat( (seq, x.view(x.size(0), -1).unsqueeze(0)), dim = 1 )
+            print("NEW SEQUENCE SHAPE: ", seq.shape)
         else:
-            # print(hidden.shape)
-            out = self.fca(torch.cat((x, hidden), dim = 2))
-            hidden = out.detach().clone()
-        # print(hidden)
-        out = self.relu(out)
-        out = self.fcb(out)
-        out = self.relu(out)
-        out = self.fc1(out)
-        out = self.relu(out)
-        out = self.fc2(out)
-        out = self.relu(out)
-        out = self.fc3(out)
-        out = self.relu(out)
-        out = self.fc4(out)
-        return out, hidden
+            seq = x.view(x.size(0), -1).unsqueeze(0)
 
+        pred = self.rnn(seq)[0][:, -1, :].unsqueeze(0)
 
-
-
-# rnn = torch.nn.LSTM(input_size = 512, hidden_size = 1, num_layers = 2, batch_first = True)
-# input = torch.randn(1, 1, 512)
-# h0 = torch.randn(2, 1, 1)
-# c0 = torch.randn(2, 1, 1)
-# output, (hn, cn) = rnn(input, (h0, c0))
+        if select:
+            return self.head(x.view(x.size(0), -1)), self.fc(pred), x.view(x.size(0), -1).unsqueeze(0)
+        else:
+            return self.head(x.view(x.size(0), -1)), self.fc(pred)
+   

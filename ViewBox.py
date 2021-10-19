@@ -24,8 +24,6 @@ class ViewBox(object):
         # SELF.X = WIDTH; SELF.Y = HEIGHT
 
         self.obs_shp = obs_shp
-        # self.x = int(self.obs_shp[1] / 2)
-        # self.y = int(self.obs_shp[0] / 2)
         self.color = (255, 0, 0) # Blue color in BGR
         self.thickness = 2 # Line thickness of 2 px
         self.radius = radius

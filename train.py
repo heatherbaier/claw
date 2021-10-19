@@ -34,6 +34,8 @@ for epoch in range(0, 10):
         # Select and perform an action
         action = env.select_action()
 
+        
+
         # Save current state so we can push it to memory in a couple lines
         current_state = env.view_box.clip_image(cv2.imread("./test_image.png"))
 
