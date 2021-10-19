@@ -75,12 +75,6 @@ class EarthObs(Env):
         # init the canvas
         self.canvas = cv2.imread("./test_image.png")
 
-        # This is the model that stacks the selected squares together into a final prediction
-        # THIS NEEDS A LOT OF WORK
-        self.rnn = lstm()
-        self.rnn_optim = torch.optim.Adam(self.rnn.parameters(), lr = 0.01)
-        self.rnn_criterion = torch.nn.L1Loss()   
-
         # OBVIOUSLY TAKE THIS OUT WHEN YOU START REAL TRAINING
         self.y_val = torch.tensor([[420]])
         self.error = 0
@@ -101,6 +95,9 @@ class EarthObs(Env):
         self.TARGET_UPDATE = 10
         self.steps_done = 0
         self.total_moves = 0
+
+        self.criterion = nn.L1Loss()
+
 
 
     def optimize_model(self):
@@ -151,8 +148,7 @@ class EarthObs(Env):
         expected_state_action_values = (next_state_values * self.GAMMA) + reward_batch
 
         # Compute Huber loss
-        criterion = nn.SmoothL1Loss()
-        loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
+        loss = self.criterion(state_action_values, expected_state_action_values.unsqueeze(1))
 
         # Optimize the model
         optimizer.zero_grad()
@@ -323,7 +319,7 @@ class EarthObs(Env):
             # print("LAST GRAB SO OPTIMIZING RNN!")
             # Calculate the loss and ~optimize~
             # DON'T RUN THIS UNTIL THE SEQUENCE IS DONE (I.E. UNTIL NUM_GRABS_LEFT = 0)
-            mig_loss = self.mig_criterion(mig_pred, self.y_val)
+            mig_loss = self.criterion(mig_pred, self.y_val)
             optimizer.zero_grad()
             mig_loss.backward()
             optimizer.step() 
@@ -410,7 +406,7 @@ class EarthObs(Env):
 
 
     def update_mig_weights(self, val):
-        mig_loss = self.mig_criterion(val, self.y_val)
+        mig_loss = self.criterion(val, self.y_val)
         optimizer.zero_grad()
         mig_loss.backward()
         optimizer.step() 
