@@ -314,11 +314,7 @@ class EarthObs(Env):
 
             self.grab_vectors.append(fc_layer.detach())
 
-            # if self.grabs_left == 0:
-
-            # print("LAST GRAB SO OPTIMIZING RNN!")
             # Calculate the loss and ~optimize~
-            # DON'T RUN THIS UNTIL THE SEQUENCE IS DONE (I.E. UNTIL NUM_GRABS_LEFT = 0)
             mig_loss = self.criterion(mig_pred, self.y_val)
             optimizer.zero_grad()
             mig_loss.backward()
