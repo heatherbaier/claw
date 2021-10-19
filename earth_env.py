@@ -75,13 +75,6 @@ class EarthObs(Env):
         # init the canvas
         self.canvas = cv2.imread("./test_image.png")
 
-        # This is currently the model that predicts for a singular square of landsat (BUT EVENTUALLY MODIS), the number of migrants
-        # NEED TO THE TEST JUST USING TH EPOLICY NET'S CONVOLUTIONAL LAYERS TO DO THIS
-        self.critic = mig_model(models.resnet18(pretrained = True))
-        self.critic.fc = torch.nn.Linear(512, 1)
-        self.mig_optim = torch.optim.Adam(self.critic.parameters(), lr = 0.01)
-        self.mig_criterion = torch.nn.L1Loss()     
-
         # This is the model that stacks the selected squares together into a final prediction
         # THIS NEEDS A LOT OF WORK
         self.rnn = lstm()
