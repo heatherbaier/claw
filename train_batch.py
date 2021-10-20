@@ -9,7 +9,7 @@ from ViewBox import *
 from trainer import *
 from utils import *
 
-ds = Dataset(4, "./test_ims/", "./migration_data.json")
+ds = Dataset(1, "./test_ims/", "./migration_data.json")
 
 print(len(ds.data))
 

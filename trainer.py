@@ -110,7 +110,7 @@ class Trainer():
             return torch.cat([torch.tensor([[random.randrange(self.n_actions)]]) for i in range(0, state.shape[0])])
 
 
-    def step(self, action, initial_states):
+    def step(self, action, initial_state, vb, y_val):
 
         """
         Function to handle what happens each time the agent makes a move
@@ -125,20 +125,22 @@ class Trainer():
         # If the action is a select...
         if action == 4:
 
-            pass
+            # pass
 
-        #     # Update the number of selects left
-        #     self.grabs_left -= 1
+            # Update the number of selects left
+            vb.update_grabs_left()
 
-        #     # Get the new screen and extract the landsat from that area
-        #     new_screen = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
+            print("GRABS LEFT: ", vb.grabs_left)
+
+            # Get the new screen and extract the landsat from that area
+            new_screen = vb.clip_image()
             
-        #     if len(self.grab_vectors) == 0:
-        #         _, mig_pred, fc_layer = policy_net(new_screen, seq = None, select = True)
-        #     else:
-        #         seq = torch.cat(self.grab_vectors, dim = 1)
-        #         print("SEQUENCE SHAPE: ", seq.shape)
-        #         _, mig_pred, fc_layer = policy_net(new_screen, seq = seq, select = True)
+            if len(self.grab_vectors) == 0:
+                _, mig_pred, fc_layer = self.policy_net(new_screen, seq = None, select = True)
+            else:
+                seq = torch.cat(self.grab_vectors, dim = 1)
+                print("SEQUENCE SHAPE: ", seq.shape)
+                _, mig_pred, fc_layer = self.policy_net(new_screen, seq = seq, select = True)
 
         #     self.grab_vectors.append(fc_layer.detach())
 
@@ -191,9 +193,9 @@ class Trainer():
             # self.total_moves += 1
 
             # Get the screen & the prediction for the current state before you take an action
-            current_screen = initial_states
+            current_screen = initial_state
 
-            print("current_screen shape: ", current_screen.shape)
+            # print("current_screen shape: ", current_screen.shape)
 
             if len(self.grab_vectors) == 0:
                 _, mig_pred_t1 = self.policy_net(current_screen, seq = None)
@@ -201,37 +203,56 @@ class Trainer():
                 seq = torch.cat(self.grab_vectors, dim = 1)
                 _, mig_pred_t1 = self.policy_net(current_screen, seq = seq)
 
-            print(mig_pred_t1)
+            # print("OLD PRED: ", mig_pred_t1)
 
             # self.update_mig_weights(mig_pred_t1)
+
+            # print("OLD POSITION: ", vb.get_position())
             
-            # # Now take the action and update the view_boxes position (and therefore our state)
-            # self.view_box.move_box(action)
+            # Now take the action and update the view_boxes position (and therefore our state)
+            vb.move_box(action)
+
+            # print("NEW POSITION: ", vb.get_position())
 
             # # Draw pretty
             # self.draw_elements_on_canvas()
 
             # # Get the screen & the prediction for the current state before you take an action
-            # new_screen = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
+            new_screen = vb.clip_image()
 
-            # if len(self.grab_vectors) == 0:
-            #     _, mig_pred_t2 = policy_net(current_screen, seq = None)
-            # else:
-            #     seq = torch.cat(self.grab_vectors, dim = 1)
-            #     _, mig_pred_t2 = policy_net(current_screen, seq = seq)
+            # print("NEW SCREEN SHAPE: ", new_screen.shape)
 
-            # self.update_mig_weights(mig_pred_t2)
+            if len(self.grab_vectors) == 0:
+                _, mig_pred_t2 = self.policy_net(current_screen, seq = None)
+            else:
+                seq = torch.cat(self.grab_vectors, dim = 1)
+                _, mig_pred_t2 = self.policy_net(current_screen, seq = seq)
 
-            # # If the screen after the action was taken is closer to the true value than before, give the model a reward
-            # if abs(self.y_val - mig_pred_t1) > abs(self.y_val - mig_pred_t2):
-            #     reward = 10
-            # else:
-            #     reward = 0
+            """ FIX THIS LATER ON YO """
+            # self.update_mig_weights(pred = mig_pred_t1, target = y_val)
+            self.update_mig_weights(pred = mig_pred_t2, target = y_val)
+
+            # If the screen after the action was taken is closer to the true value than before, give the model a reward
+            if abs(y_val - mig_pred_t1) > abs(y_val - mig_pred_t2):
+                reward = 10
+            else:
+                reward = 0
 
 
-            return [1,reward,done,4]
+            return [1,reward,done,4,vb]
 
 
+    def update_mig_weights(self, pred, target):
+
+        target = torch.tensor([[target]])
+        pred = pred.squeeze(0)
+
+        # print("PRED: ", pred, "  |  TARGET: ", target)
+
+        mig_loss = self.criterion(pred, target)
+        self.optimizer.zero_grad()
+        mig_loss.backward()
+        self.optimizer.step() 
 
 
     def train(self):
@@ -246,6 +267,8 @@ class Trainer():
     def train_one_epoch(self, epoch):
 
         for b, (batch) in enumerate(self.train_dl):
+
+            print(batch.vbs)
 
             done = False
 
@@ -266,7 +289,7 @@ class Trainer():
                 current_state = states
 
                 # Calculate the state-action pair's reward and done flag
-                _, reward, done, _ = self.step(actions, current_state)
+                _, reward, done, _, batch.vbs[0] = self.step(actions, current_state, batch.vbs[0], batch.ys[0])
                 
 
             print(actions)

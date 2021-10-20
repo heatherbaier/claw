@@ -19,7 +19,7 @@ class ViewBox(object):
     name: name of the point
     """
     
-    def __init__(self, image, radius = 64):
+    def __init__(self, image, max_grabs = 5, radius = 64):
 
         # SELF.X = WIDTH; SELF.Y = HEIGHT
 
@@ -39,6 +39,12 @@ class ViewBox(object):
         self.x = random.randint(self.x_min, self.x_max)
         self.y = random.randint(self.y_min, self.y_max)
 
+        self.max_grabs = max_grabs
+        self.grabs_left = max_grabs
+
+    def update_grabs_left(self):
+        self.grabs_left -= 1
+        return 
 
     def get_position(self):
         return (self.x, self.y)
