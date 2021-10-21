@@ -1,5 +1,6 @@
 from torchvision import models, transforms
 import torch
+import json
 import cv2 
 
 from earth_env import *
@@ -10,51 +11,56 @@ font = cv2.FONT_HERSHEY_COMPLEX_SMALL
 torch.autograd.set_detect_anomaly(True)
 
 
-to_tens = transforms.ToTensor()
+def train(env, display = True):
 
-env = EarthObs(num_channels = 3, num_actions = 5)
+    for epoch in range(0, 10):
 
-for epoch in range(0, 10):
+        # Reset the environment to the beginning
+        obs = env.reset(epoch = epoch)
 
-    # Reset the environment to the beginning
-    obs = env.reset(epoch = epoch)
+        # Set done flag
+        done = False
 
-    # Capctur ethe current screen at the starting position
-    current_screen = env.view_box.clip_image(cv2.imread("./test_image.png"))
+        # While there are still selects left...
+        while not done:
 
-    # Reset the ReplayMemory (LOOK INTO THIS)
-    # memory = ReplayMemory(10000)
+            # Select and perform an action
+            action = env.select_action()
 
-    # Set done flag
-    done = False
+            # Save current state so we can push it to memory in a couple lines
+            current_state = env.view_box.clip_image(cv2.imread(impath))
 
-    # While there are still selects left...
-    while not done:
+            # Calculate the state-action pair's reward and done flag
+            mp, reward, done, _ = env.step(action.item())
 
-        # Select and perform an action
-        action = env.select_action()
+            # Get the new state post action
+            next_state = env.view_box.clip_image(cv2.imread(impath))
 
-        
+            # Push all of the goodness to memory
+            memory.push(to_tens(current_state).unsqueeze(0), action, to_tens(next_state).unsqueeze(0), torch.tensor([reward]))
 
-        # Save current state so we can push it to memory in a couple lines
-        current_state = env.view_box.clip_image(cv2.imread("./test_image.png"))
+            # Put it on da screen
+            if display:
+                env.render()
 
-        # Calculate the state-action pair's reward and done flag
-        _, reward, done, _ = env.step(action.item())
+            # Perform one step of the optimization (on the policy network)
+            env.optimize_model()
 
-        # Get the new state post action
-        next_state = env.view_box.clip_image(cv2.imread("./test_image.png"))
+        print("Epoch: {}  |  Predicted Migrants: {}".format(epoch, mp.item()))
+        # print("\n")
 
-        # Push all of this goodness to memory
-        memory.push(to_tens(current_state).unsqueeze(0), action, to_tens(next_state).unsqueeze(0), torch.tensor([reward]))
+if __name__ == "__main__":
 
-        # Put it on da screen
-        env.render()
+    with open("./migration_data.json", "r") as f:
+        mig_data = json.load(f)
 
-        # Perform one step of the optimization (on the policy network)
-        env.optimize_model()
+    impath = "./test_ims/484019039.png"
+    muni_id = "484019039"
+    y_val = mig_data[muni_id]
 
-        print("\n")
+    display = True
+    to_tens = transforms.ToTensor()
 
+    env = EarthObs(impath = impath, y_val = y_val, num_channels = 3, num_actions = 5, display = display)
 
-    # env.close()
+    train(env, display)

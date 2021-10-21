@@ -41,7 +41,6 @@ class DQN(nn.Module):
 
         if seq is not None:
             seq = torch.cat( (seq, x.view(x.size(0), -1).unsqueeze(0)), dim = 1 )
-            print("NEW SEQUENCE SHAPE: ", seq.shape)
         else:
             seq = x.view(x.size(0), -1).unsqueeze(0)
 

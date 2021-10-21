@@ -49,16 +49,24 @@ Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'
 
 class EarthObs(Env):
 
-    def __init__(self, num_channels, num_actions):
+    def __init__(self, impath, y_val, num_channels, num_actions, display = True):
         super(EarthObs, self).__init__()
 
         """ define obervation and action spaces in here"""
 
-        # define a 2-d observation space
-        self.observation_shape = (953, 1240, 3) # (H, W, C)
-        self.obseervation_space = spaces.Box(low = np.zeros(self.observation_shape), 
-                                             high = np.ones(self.observation_shape),
-                                             dtype = np.float16)
+        self.display = display
+
+        # init the image data and canvas
+        self.impath = impath
+        self.image = cv2.imread(self.impath)
+        self.canvas = self.image
+
+        # Define a 3D observation space
+        self.observation_shape = self.image.shape # (H, W, C)
+        print(self.image.shape)
+        # self.obseervation_space = spaces.Box(low = np.zeros(self.observation_shape), 
+        #                                      high = np.ones(self.observation_shape),
+        #                                      dtype = np.float16)
 
         # define an action space range from 0 to 4
         self.action_space = spaces.Discrete(num_actions,)
@@ -72,11 +80,8 @@ class EarthObs(Env):
         # Set up the view box object that the agent controls
         self.view_box = ViewBox(self.observation_shape)
 
-        # init the canvas
-        self.canvas = cv2.imread("./test_image.png")
-
         # OBVIOUSLY TAKE THIS OUT WHEN YOU START REAL TRAINING
-        self.y_val = torch.tensor([[420]])
+        self.y_val = torch.tensor([[y_val]])
         self.error = 0
         self.mig_pred = 0
 
@@ -167,7 +172,7 @@ class EarthObs(Env):
         global steps_done
 
         # Read in the image and convert it to a tensor
-        state = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
+        state = self.to_tens(self.view_box.clip_image(self.image)).unsqueeze(0)
         
         # Get a random number between 0 & 1
         sample = random.random()
@@ -182,12 +187,12 @@ class EarthObs(Env):
                 # t.max(1) will return largest column value of each row.
                 # second column on max result is index of where max element was
                 # found, so we pick action with the larger expected reward.
-                print("Computed action!", self.eps_threshold)
+                # print("Computed action!", self.eps_threshold)
                 return policy_net(state)[0].max(1)[1].view(1, 1)
 
         # Otherwise, pick a random action
         else:
-            print("Random action! Epsilon = ", self.eps_threshold)
+            # print("Random action! Epsilon = ", self.eps_threshold)
             return torch.tensor([[random.randrange(self.n_actions)]], device = self.device, dtype=torch.long)
             
 
@@ -198,7 +203,7 @@ class EarthObs(Env):
         """
 
         # Sert up the canvas with the initial Landsat image
-        self.canvas = cv2.imread("./test_image.png")
+        self.canvas = cv2.imread(self.impath)
 
         # If the action was a select, the box will draw as green, otherwise it'll draw as red
         if red:
@@ -230,8 +235,9 @@ class EarthObs(Env):
                     1.5, (255, 255, 255), 1, cv2.LINE_AA)
 
         # Render the Epoch summary screen and make it wait a sec so user can read it
-        self.render()
-        time.sleep(4)
+        if self.display:
+            self.render()
+            time.sleep(4)
 
         # Reset all of the tracking variables
         self.first_grab = True
@@ -245,7 +251,7 @@ class EarthObs(Env):
         self.view_box = ViewBox(self.observation_shape)
 
         # Reset the canvas to the Landsat image
-        self.canvas = cv2.imread("./test_image.png")
+        self.canvas = cv2.imread(self.impath)
 
         # Draw the elements on the canvas
         self.draw_elements_on_canvas()
@@ -303,13 +309,13 @@ class EarthObs(Env):
             # self.view_box.move_box(action)
 
             # Get the new screen and extract the landsat from that area
-            new_screen = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
+            new_screen = self.to_tens(self.view_box.clip_image(self.image)).unsqueeze(0)
             
             if len(self.grab_vectors) == 0:
                 _, mig_pred, fc_layer = policy_net(new_screen, seq = None, select = True)
             else:
                 seq = torch.cat(self.grab_vectors, dim = 1)
-                print("SEQUENCE SHAPE: ", seq.shape)
+                # print("SEQUENCE SHAPE: ", seq.shape)
                 _, mig_pred, fc_layer = policy_net(new_screen, seq = seq, select = True)
 
             self.grab_vectors.append(fc_layer.detach())
@@ -323,7 +329,7 @@ class EarthObs(Env):
             # Save the previous prediction of the LSTM so we can use it to calculate the reward
             prev_pred = self.mig_pred
 
-            print("RNN MIG PRED: ", mig_pred, self.y_val)
+            # print("RNN MIG PRED: ", mig_pred, self.y_val)
 
             # Update the new error
             self.error = mig_pred - self.y_val
@@ -339,12 +345,12 @@ class EarthObs(Env):
 
                 self.draw_elements_on_canvas()
                 done = True
-                return [1,2,done,4]
+                return [mig_pred,2,done,4]
 
             # If there are still more grabs left, calculate the reward and return not done
             else:
 
-                print("OVERALL MIG PRED: ", self.mig_pred)
+                # print("OVERALL MIG PRED: ", self.mig_pred)
 
                 if abs(self.y_val - prev_pred) > abs(self.y_val - self.mig_pred):
                     reward = 10
@@ -363,7 +369,7 @@ class EarthObs(Env):
             self.total_moves += 1
 
             # Get the screen & the prediction for the current state before you take an action
-            current_screen = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
+            current_screen = self.to_tens(self.view_box.clip_image(self.image)).unsqueeze(0)
             # _, mig_pred_t1 = policy_net(current_screen)
 
             if len(self.grab_vectors) == 0:
@@ -381,7 +387,7 @@ class EarthObs(Env):
             self.draw_elements_on_canvas()
 
             # Get the screen & the prediction for the current state before you take an action
-            new_screen = self.to_tens(self.view_box.clip_image(cv2.imread("./test_image.png"))).unsqueeze(0)
+            new_screen = self.to_tens(self.view_box.clip_image(self.image)).unsqueeze(0)
 
             if len(self.grab_vectors) == 0:
                 _, mig_pred_t2 = policy_net(current_screen, seq = None)
