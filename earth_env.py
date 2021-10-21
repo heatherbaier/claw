@@ -347,7 +347,7 @@ class EarthObs(Env):
                 print("OVERALL MIG PRED: ", self.mig_pred)
 
                 if abs(self.y_val - prev_pred) > abs(self.y_val - self.mig_pred):
-                    reward = 20
+                    reward = 10
                 else:
                     reward = 0
                 
@@ -372,7 +372,7 @@ class EarthObs(Env):
                 seq = torch.cat(self.grab_vectors, dim = 1)
                 _, mig_pred_t1 = policy_net(current_screen, seq = seq)
 
-            self.update_mig_weights(mig_pred_t1)
+            # self.update_mig_weights(mig_pred_t1)
             
             # Now take the action and update the view_boxes position (and therefore our state)
             self.view_box.move_box(action)
@@ -389,7 +389,7 @@ class EarthObs(Env):
                 seq = torch.cat(self.grab_vectors, dim = 1)
                 _, mig_pred_t2 = policy_net(current_screen, seq = seq)
 
-            self.update_mig_weights(mig_pred_t2)
+            # self.update_mig_weights(mig_pred_t2)
 
             # If the screen after the action was taken is closer to the true value than before, give the model a reward
             if abs(self.y_val - mig_pred_t1) > abs(self.y_val - mig_pred_t2):
