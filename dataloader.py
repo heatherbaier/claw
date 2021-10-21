@@ -50,7 +50,7 @@ class Dataset():
             im = self.to_tens(im).unsqueeze(0)
 
             ims.append(im)
-            vbs.append(ViewBox(image = im))
+            vbs.append(ViewBox(image = im, name = impath))
             ys.append(self.ys[impath.replace(".png", "")])
 
             # If we are at the last element before we reset the lists, create a Batch 

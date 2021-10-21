@@ -40,6 +40,7 @@ class Trainer():
 
         # Variable initlialization
         self.n_actions = self.action_space.n
+        print(" NUMBER OF ACTIONS: ", self.n_actions)
         self.device = "cpu"
         self.eps_threshold = .9
         self.epoch = 0
@@ -101,12 +102,12 @@ class Trainer():
         # If the random number is larger than eps_threshold, use the trained policy to pick an action
         if sample > self.eps_threshold:
             with torch.no_grad():
-                print("Computed action!", self.eps_threshold)
+                # print("Computed action!", self.eps_threshold)
                 return self.policy_net(state)[0].max(1)[1].view(1, 1)
 
         # Otherwise, pick a random action
         else:
-            print("Random action! Epsilon = ", self.eps_threshold)
+            # print("Random action! Epsilon = ", self.eps_threshold)
             return torch.cat([torch.tensor([[random.randrange(self.n_actions)]]) for i in range(0, state.shape[0])])
 
 
@@ -130,7 +131,7 @@ class Trainer():
             # Update the number of selects left
             vb.update_grabs_left()
 
-            print("GRABS LEFT: ", vb.grabs_left)
+            # print("GRABS LEFT: ", vb.grabs_left)
 
             # Get the new screen and extract the landsat from that area
             new_screen = vb.clip_image()
@@ -139,7 +140,7 @@ class Trainer():
                 _, mig_pred, fc_layer = self.policy_net(new_screen, seq = None, select = True)
             else:
                 seq = torch.cat(self.grab_vectors, dim = 1)
-                print("SEQUENCE SHAPE: ", seq.shape)
+                # print("SEQUENCE SHAPE: ", seq.shape)
                 _, mig_pred, fc_layer = self.policy_net(new_screen, seq = seq, select = True)
 
         #     self.grab_vectors.append(fc_layer.detach())
@@ -184,7 +185,6 @@ class Trainer():
         #         self.first_grab = False
 
         #         return [1,2,done,4]
-                
 
         # If the action is just a simple move...
         elif action != 4:
@@ -212,7 +212,7 @@ class Trainer():
             # Now take the action and update the view_boxes position (and therefore our state)
             vb.move_box(action)
 
-            # print("NEW POSITION: ", vb.get_position())
+            print("NEW POSITION: ", vb.get_position())
 
             # # Draw pretty
             # self.draw_elements_on_canvas()
@@ -262,39 +262,40 @@ class Trainer():
             self.train_one_epoch(epoch = epoch)
 
 
-
-
     def train_one_epoch(self, epoch):
 
         for b, (batch) in enumerate(self.train_dl):
 
-            print(batch.vbs)
+            # print(batch.vbs)
 
             done = False
 
-            print([i.obs_shp for i in batch.vbs])
+            [print(i.get_position(), i.name) for i in batch.vbs]
 
             # Convert states and target outputs into a batch
             states = torch.cat([i.clip_image() for i in batch.vbs])
             targets = torch.tensor(batch.ys).view(-1, 1)
 
-            while not done:
+            # while not done:
 
-                # Select actions for each iamges in the batch
-                actions = self.select_action(states)
-
-                print(actions)
-
-                # Get the current states prior to taking the above action
-                current_state = states
-
-                # Calculate the state-action pair's reward and done flag
-                _, reward, done, _, batch.vbs[0] = self.step(actions, current_state, batch.vbs[0], batch.ys[0])
-                
+            # Select actions for each image in the batch
+            actions = self.select_action(states)
 
             print(actions)
 
-        # Reset the 'game' paremeters after each batch of images is played
+            # print(actions)
+
+            # Get the current states prior to taking the above action
+            current_state = states
+
+            # Calculate the state-action pair's reward and done flag
+            _, reward, done, _, batch.vbs[0] = self.step(actions, current_state, batch.vbs[0], batch.ys[0])
+            
+            print("\n")
+
+            # print(actions)
+
+        # Reset the 'game' parameters after each batch of images is played
         self.reset(epoch = epoch)
 
 

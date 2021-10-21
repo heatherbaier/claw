@@ -19,9 +19,11 @@ class ViewBox(object):
     name: name of the point
     """
     
-    def __init__(self, image, max_grabs = 5, radius = 64):
+    def __init__(self, image, name, max_grabs = 5, radius = 64):
 
         # SELF.X = WIDTH; SELF.Y = HEIGHT
+
+        self.name = name
 
         self.image = image
 
@@ -52,6 +54,8 @@ class ViewBox(object):
 
     def move_box(self, a):
 
+        # print()
+
         """ moves the box in a given direction based on the action value """
 
         if a == 0: # MOVE BOX DOWN
@@ -66,7 +70,7 @@ class ViewBox(object):
         self.x = self.clamp(self.x, self.x_min, self.x_max)
         self.y = self.clamp(self.y, self.y_min, self.y_max)        
 
-        print("moved: ", self.x, self.y)
+        # print("moved: ", self.x, self.y)
 
         self.start_point = (self.x - self.radius, self.y + self.radius)
         self.end_point = (self.x + self.radius, self.y - self.radius)   
