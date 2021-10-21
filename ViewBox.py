@@ -19,11 +19,13 @@ class ViewBox(object):
     name: name of the point
     """
     
-    def __init__(self, obs_shp, radius = 64):
+    def __init__(self, image, max_grabs = 5, radius = 64):
 
         # SELF.X = WIDTH; SELF.Y = HEIGHT
 
-        self.obs_shp = obs_shp
+        self.image = image
+
+        self.obs_shp = (self.image.shape[2], self.image.shape[3])
         self.color = (255, 0, 0) # Blue color in BGR
         self.thickness = 2 # Line thickness of 2 px
         self.radius = radius
@@ -37,6 +39,12 @@ class ViewBox(object):
         self.x = random.randint(self.x_min, self.x_max)
         self.y = random.randint(self.y_min, self.y_max)
 
+        self.max_grabs = max_grabs
+        self.grabs_left = max_grabs
+
+    def update_grabs_left(self):
+        self.grabs_left -= 1
+        return 
 
     def get_position(self):
         return (self.x, self.y)
@@ -69,6 +77,6 @@ class ViewBox(object):
         return max(min(maxn, n), minn)
 
 
-    def clip_image(self, im):
+    def clip_image(self):
         """ Function to send back just the view_box.radius*2 x view_box.radius*2 square around the current image coordinate """
-        return im[self.y - self.radius:self.y + self.radius, self.x - self.radius:self.x + self.radius, :]
+        return self.image[:, :, self.y - self.radius:self.y + self.radius, self.x - self.radius:self.x + self.radius]
