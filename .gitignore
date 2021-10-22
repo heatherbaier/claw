@@ -1,5 +1,6 @@
 imagery
 archive
+batch_imagery
 geo*
 .ipynb*
 __pycache__

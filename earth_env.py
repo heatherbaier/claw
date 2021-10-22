@@ -289,7 +289,7 @@ class EarthObs(Env):
         cv2.destroyAllWindows()
 
 
-    def step(self, action, shared_model, optimizer):
+    def step(self, action, shared_model, optimizer, epoch_preds, lock):
 
         """
         Function to handle what happens each time the agent makes a move
@@ -344,7 +344,10 @@ class EarthObs(Env):
      
             # If there are no grabs left, update the canvas with this steps results, set the done flag to True & return 
             if self.grabs_left == 0:
-
+                
+                # with lock:
+                #     print("appending to epoch preds: ", mig_pred.numpy(), epoch_preds)
+                    
                 self.draw_elements_on_canvas()
                 done = True
                 return [mig_pred,2,done,4]
@@ -399,7 +402,6 @@ class EarthObs(Env):
                 reward = 10
             else:
                 reward = 0
-
 
             return [1,reward,done,4]
 
