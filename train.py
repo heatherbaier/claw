@@ -26,7 +26,6 @@ def train(env, impath, num_epochs, shared_model, optimizer, memory, lock, displa
             mp, reward, done, _ = env.step(action.item(), shared_model, optimizer)
             next_state = env.view_box.clip_image(cv2.imread(impath))
             memory.append((to_tens(current_state).unsqueeze(0), action, to_tens(next_state).unsqueeze(0), torch.tensor([reward])))
-            # memory.push(to_tens(current_state).unsqueeze(0), action, to_tens(next_state).unsqueeze(0), torch.tensor([reward]))
             
             with lock:
                 env.optimize_model(memory, optimizer)
