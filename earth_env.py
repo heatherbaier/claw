@@ -41,8 +41,8 @@ target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
 
 # optimizer = torch.optim.RMSprop(policy_net.parameters())
-optimizer = torch.optim.Adam(policy_net.parameters(), lr = 0.01)
-memory = ReplayMemory(10000)
+# optimizer = torch.optim.Adam(policy_net.parameters(), lr = 0.01)
+# memory = ReplayMemory(10000)
 
 Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'))
 
@@ -101,13 +101,11 @@ class EarthObs(Env):
 
 
 
-    def optimize_model(self, memory, limit = 10000):
+    def optimize_model(self, memory, optimizer, limit = 10000):
 
         """
         Function to optimize the policy_net based on saved ReplayMemory
         """
-
-        # mem_test.append('h')
 
         # If the memory doesn't have enough observations in it, don't optimize yet
         if len(memory) < self.BATCH_SIZE:
@@ -167,7 +165,7 @@ class EarthObs(Env):
         optimizer.step()
 
 
-    def select_action(self):
+    def select_action(self, shared_model):
 
         """
         Function to select either a random action or computer it using the policy_net
@@ -192,7 +190,7 @@ class EarthObs(Env):
                 # second column on max result is index of where max element was
                 # found, so we pick action with the larger expected reward.
                 # print("Computed action!", self.eps_threshold)
-                return policy_net(state)[0].max(1)[1].view(1, 1)
+                return shared_model(state)[0].max(1)[1].view(1, 1)
 
         # Otherwise, pick a random action
         else:
@@ -291,7 +289,7 @@ class EarthObs(Env):
         cv2.destroyAllWindows()
 
 
-    def step(self, action):
+    def step(self, action, shared_model, optimizer):
 
         """
         Function to handle what happens each time the agent makes a move
@@ -316,11 +314,11 @@ class EarthObs(Env):
             new_screen = self.to_tens(self.view_box.clip_image(self.image)).unsqueeze(0)
             
             if len(self.grab_vectors) == 0:
-                _, mig_pred, fc_layer = policy_net(new_screen, seq = None, select = True)
+                _, mig_pred, fc_layer = shared_model(new_screen, seq = None, select = True)
             else:
                 seq = torch.cat(self.grab_vectors, dim = 1)
                 # print("SEQUENCE SHAPE: ", seq.shape)
-                _, mig_pred, fc_layer = policy_net(new_screen, seq = seq, select = True)
+                _, mig_pred, fc_layer = shared_model(new_screen, seq = seq, select = True)
 
             self.grab_vectors.append(fc_layer.detach())
 
@@ -374,15 +372,12 @@ class EarthObs(Env):
 
             # Get the screen & the prediction for the current state before you take an action
             current_screen = self.to_tens(self.view_box.clip_image(self.image)).unsqueeze(0)
-            # _, mig_pred_t1 = policy_net(current_screen)
 
             if len(self.grab_vectors) == 0:
-                _, mig_pred_t1 = policy_net(current_screen, seq = None)
+                _, mig_pred_t1 = shared_model(current_screen, seq = None)
             else:
                 seq = torch.cat(self.grab_vectors, dim = 1)
-                _, mig_pred_t1 = policy_net(current_screen, seq = seq)
-
-            # self.update_mig_weights(mig_pred_t1)
+                _, mig_pred_t1 = shared_model(current_screen, seq = seq)
             
             # Now take the action and update the view_boxes position (and therefore our state)
             self.view_box.move_box(action)
@@ -394,12 +389,10 @@ class EarthObs(Env):
             new_screen = self.to_tens(self.view_box.clip_image(self.image)).unsqueeze(0)
 
             if len(self.grab_vectors) == 0:
-                _, mig_pred_t2 = policy_net(current_screen, seq = None)
+                _, mig_pred_t2 = shared_model(current_screen, seq = None)
             else:
                 seq = torch.cat(self.grab_vectors, dim = 1)
-                _, mig_pred_t2 = policy_net(current_screen, seq = seq)
-
-            # self.update_mig_weights(mig_pred_t2)
+                _, mig_pred_t2 = shared_model(current_screen, seq = seq)
 
             # If the screen after the action was taken is closer to the true value than before, give the model a reward
             if abs(self.y_val - mig_pred_t1) > abs(self.y_val - mig_pred_t2):
