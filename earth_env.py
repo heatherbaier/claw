@@ -64,9 +64,6 @@ class EarthObs(Env):
         # Define a 3D observation space
         self.observation_shape = self.image.shape # (H, W, C)
         print(self.image.shape)
-        # self.obseervation_space = spaces.Box(low = np.zeros(self.observation_shape), 
-        #                                      high = np.ones(self.observation_shape),
-        #                                      dtype = np.float16)
 
         # define an action space range from 0 to 4
         self.action_space = spaces.Discrete(num_actions,)
@@ -78,9 +75,8 @@ class EarthObs(Env):
         self.max_grabs = 5
 
         # Set up the view box object that the agent controls
-        self.view_box = ViewBox(self.observation_shape)
+        self.view_box = ViewBox(image = self.image)
 
-        # OBVIOUSLY TAKE THIS OUT WHEN YOU START REAL TRAINING
         self.y_val = torch.tensor([[y_val]])
         self.error = 0
         self.mig_pred = 0
@@ -248,7 +244,7 @@ class EarthObs(Env):
         self.grab_vectors = []
 
         # Reset the viewbox to its inital position
-        self.view_box = ViewBox(self.observation_shape)
+        self.view_box = ViewBox(image = self.image)
 
         # Reset the canvas to the Landsat image
         self.canvas = cv2.imread(self.impath)

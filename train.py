@@ -11,43 +11,28 @@ font = cv2.FONT_HERSHEY_COMPLEX_SMALL
 torch.autograd.set_detect_anomaly(True)
 
 
-def train(env, display = True):
+def train(env, impath, num_epochs, display = True):
 
-    for epoch in range(0, 10):
+    to_tens = transforms.ToTensor()
 
-        # Reset the environment to the beginning
-        obs = env.reset(epoch = epoch)
+    for epoch in range(0, num_epochs):
 
-        # Set done flag
+        env.reset(epoch = epoch)
         done = False
 
-        # While there are still selects left...
         while not done:
-
-            # Select and perform an action
             action = env.select_action()
-
-            # Save current state so we can push it to memory in a couple lines
             current_state = env.view_box.clip_image(cv2.imread(impath))
-
-            # Calculate the state-action pair's reward and done flag
             mp, reward, done, _ = env.step(action.item())
-
-            # Get the new state post action
             next_state = env.view_box.clip_image(cv2.imread(impath))
-
-            # Push all of the goodness to memory
             memory.push(to_tens(current_state).unsqueeze(0), action, to_tens(next_state).unsqueeze(0), torch.tensor([reward]))
+            env.optimize_model()
 
-            # Put it on da screen
             if display:
                 env.render()
 
-            # Perform one step of the optimization (on the policy network)
-            env.optimize_model()
-
         print("Epoch: {}  |  Predicted Migrants: {}".format(epoch, mp.item()))
-        # print("\n")
+
 
 if __name__ == "__main__":
 
@@ -63,4 +48,4 @@ if __name__ == "__main__":
 
     env = EarthObs(impath = impath, y_val = y_val, num_channels = 3, num_actions = 5, display = display)
 
-    train(env, display)
+    train(env, 10, display)

@@ -73,6 +73,10 @@ if __name__ == '__main__':
         p = mp.Process(target=train, args=(rank, args, shared_model, counter, lock, optimizer))
         p.start()
         processes.append(p)
+    
+    # The point of this below is to make sure that all of the prcoesses above can run simultaneously,
+    # without one needing to wait for another to finsih before it can start, but adding the .join
+    # in this way prevents any code underneath the training process to execute before the curren batch finishes
     for p in processes:
         p.join()
 
