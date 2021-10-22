@@ -101,16 +101,24 @@ class EarthObs(Env):
 
 
 
-    def optimize_model(self):
+    def optimize_model(self, memory, limit = 10000):
 
         """
         Function to optimize the policy_net based on saved ReplayMemory
         """
 
+        # mem_test.append('h')
+
+        # If the memory doesn't have enough observations in it, don't optimize yet
         if len(memory) < self.BATCH_SIZE:
             return
 
-        transitions = memory.sample(self.BATCH_SIZE)
+        # If the memory hits the specified length limit, 
+        # remove the oldest (first) one in the list
+        if len(memory) == limit:
+            memory.pop(0)
+
+        transitions = random.sample(list(memory), self.BATCH_SIZE)
 
         # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
         # detailed explanation). This converts batch-array of Transitions

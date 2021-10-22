@@ -1,12 +1,31 @@
-from multiprocessing import Process, Pipe
+# from multiprocessing import Process, Array, Pipe, Lock
+import torch.multiprocessing as mp
 
-def f(conn):
-    conn.send([42, None, 'hello'])
-    conn.close()
+
+def here(memory, val, lock, limit = 5):
+
+    with lock:
+        memory.append(val)
+
+        if len(memory) == limit + 1:
+            memory.pop(0)
+
+    print(memory)
+
 
 if __name__ == '__main__':
-    parent_conn, child_conn = Pipe()
-    p = Process(target=f, args=(child_conn,))
-    p.start()
-    print(parent_conn.recv())   # prints "[42, None, 'hello']"
-    p.join()
+
+    with mp.Manager() as manager:
+        
+
+        memory = manager.list()
+        processes = []
+        lock = mp.Lock()
+
+        for val in range(0, 10):
+            p = mp.Process(target = here, args = (memory, val, lock, ))
+            p.start()
+            processes.append(p)
+
+        for p in processes:
+            p.join()

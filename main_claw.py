@@ -15,27 +15,32 @@ font = cv2.FONT_HERSHEY_COMPLEX_SMALL
 torch.autograd.set_detect_anomaly(True)
 
 
-def run_batch(env):
-    train(env = env[2], impath = env[0], num_epochs = 5, display = True)
+def run_batch(env, memory):
+    train(env = env[2], impath = env[0], num_epochs = 5, memory = memory, display = True)
 
 
 if __name__ == "__main__":
 
     data = Dataset(batch_size = 2, imagery_dir = "test_ims", json_path = "migration_data.json")
 
-    processes = []
+    with mp.Manager() as manager:
 
-    # For every list of lists within the dataloader (i.e. for every batch...)
-    for batch in data.data:
+        processes = []
+        # memory = ReplayMemory(10000)
+        memory = manager.list()
+        lock = mp.Lock()
 
-        # For each observation/image in the batch, start a training prcoess for it
-        for obs in batch:
+        # For every list of lists within the dataloader (i.e. for every batch...)
+        for batch in data.data:
 
-            p = mp.Process(target = run_batch, args=(obs, ))
-            p.start()
-            processes.append(p)
+            # For each observation/image in the batch, start a training prcoess for it
+            for obs in batch:
 
-        for p in processes:
-            p.join()
+                p = mp.Process(target = train, args=(obs[2], obs[0], 5, memory, lock, True, ))
+                p.start()
+                processes.append(p)
 
-    print("yo")
+            for p in processes:
+                p.join()
+
+        print("yo")

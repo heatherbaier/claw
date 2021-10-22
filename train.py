@@ -11,7 +11,7 @@ font = cv2.FONT_HERSHEY_COMPLEX_SMALL
 torch.autograd.set_detect_anomaly(True)
 
 
-def train(env, impath, num_epochs, display = True):
+def train(env, impath, num_epochs, memory, lock, display = True):
 
     to_tens = transforms.ToTensor()
 
@@ -25,8 +25,11 @@ def train(env, impath, num_epochs, display = True):
             current_state = env.view_box.clip_image(cv2.imread(impath))
             mp, reward, done, _ = env.step(action.item())
             next_state = env.view_box.clip_image(cv2.imread(impath))
-            memory.push(to_tens(current_state).unsqueeze(0), action, to_tens(next_state).unsqueeze(0), torch.tensor([reward]))
-            env.optimize_model()
+            memory.append((to_tens(current_state).unsqueeze(0), action, to_tens(next_state).unsqueeze(0), torch.tensor([reward])))
+            # memory.push(to_tens(current_state).unsqueeze(0), action, to_tens(next_state).unsqueeze(0), torch.tensor([reward]))
+            
+            with lock:
+                env.optimize_model(memory)
 
             if display:
                 env.render()
@@ -42,6 +45,7 @@ if __name__ == "__main__":
     impath = "./test_ims/484019039.png"
     muni_id = "484019039"
     y_val = mig_data[muni_id]
+    memory = ReplayMemory(10000)
 
     display = True
     to_tens = transforms.ToTensor()
