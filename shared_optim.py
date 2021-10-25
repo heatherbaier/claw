@@ -3,6 +3,9 @@ import math
 import torch
 import torch.optim as optim
 
+import warnings
+warnings.filterwarnings("ignore")
+
 
 class SharedAdam(optim.Adam):
     """Implements Adam algorithm with shared states.
