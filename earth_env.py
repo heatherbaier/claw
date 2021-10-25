@@ -48,7 +48,21 @@ Transition = namedtuple('Transition', ('state', 'action', 'next_state', 'reward'
 
 class EarthObs(Env):
 
-    def __init__(self, impath, y_val, num_channels, num_actions, display = True):
+    def __init__(self, 
+                impath, 
+                y_val, 
+                num_channels, 
+                num_actions, 
+                display = True, 
+                valid = False,
+                BATCH_SIZE = 4,
+                GAMMA = 0.999,
+                EPS_START = .9,
+                EPS_END = 0.05,
+                EPS_DECAY = 200,
+                TARGET_UPDATE = 10):
+
+
         super(EarthObs, self).__init__()
 
         """ define obervation and action spaces in here"""
@@ -85,16 +99,18 @@ class EarthObs(Env):
         # Variable initlialization
         self.n_actions = self.action_space.n
         self.device = "cpu"
-        self.eps_threshold = .9
+        self.eps_threshold = EPS_START
         self.epoch = 0
-        self.BATCH_SIZE = 4
-        self.GAMMA = 0.999
-        self.EPS_START = .9
-        self.EPS_END = 0.05
-        self.EPS_DECAY = 200
-        self.TARGET_UPDATE = 10
+        self.BATCH_SIZE = BATCH_SIZE
+        self.GAMMA = GAMMA
+        self.EPS_START = EPS_START
+        self.EPS_END = EPS_END
+        self.EPS_DECAY = EPS_DECAY
+        self.TARGET_UPDATE = TARGET_UPDATE
         self.steps_done = 0
         self.total_moves = 0
+
+        self.valid = valid
 
         self.criterion = nn.L1Loss()
 
@@ -227,22 +243,22 @@ class EarthObs(Env):
 
     def reset(self, epoch):
 
-        # Set up a blank (black) canvas so we can put summarized Epoch information on it
-        self.canvas = np.zeros((self.observation_shape[0], self.observation_shape[1], 3))
+        # # Set up a blank (black) canvas so we can put summarized Epoch information on it
+        # self.canvas = np.zeros((self.observation_shape[0], self.observation_shape[1], 3))
 
-        # Set up a list of text variables summarizing the Epoch and their screen locations
-        text = ["Epoch: {}".format(self.epoch), "Epoch Predicted # Migrants: {}".format(int(self.mig_pred)), "Epoch Total Error: {} migrants".format(int(self.error)), "Epsilon: {}".format(round(self.eps_threshold, 2)), "Land Cover %: {}".format(0)]
-        locs = [(50,50), (50,90), (50,130), (50,170), (50,210)]
+        # # Set up a list of text variables summarizing the Epoch and their screen locations
+        # text = ["Epoch: {}".format(self.epoch), "Epoch Predicted # Migrants: {}".format(int(self.mig_pred)), "Epoch Total Error: {} migrants".format(int(self.error)), "Epsilon: {}".format(round(self.eps_threshold, 2)), "Land Cover %: {}".format(0)]
+        # locs = [(50,50), (50,90), (50,130), (50,170), (50,210)]
 
-        # Then interate over the lists and put the information on the canvas
-        for i in zip(text, locs):
-            self.canvas = cv2.putText(self.canvas, i[0], i[1], font,  
-                    1.5, (255, 255, 255), 1, cv2.LINE_AA)
+        # # Then interate over the lists and put the information on the canvas
+        # for i in zip(text, locs):
+        #     self.canvas = cv2.putText(self.canvas, i[0], i[1], font,  
+        #             1.5, (255, 255, 255), 1, cv2.LINE_AA)
 
-        # Render the Epoch summary screen and make it wait a sec so user can read it
-        if self.display:
-            self.render()
-            time.sleep(4)
+        # # Render the Epoch summary screen and make it wait a sec so user can read it
+        # if self.display:
+        #     self.render()
+            # time.sleep(4)
 
         # Reset all of the tracking variables
         self.first_grab = True
@@ -251,8 +267,9 @@ class EarthObs(Env):
         self.epoch = epoch
         self.grabs_left = self.max_grabs
         self.grab_vectors = []
-        self.eps_threshold = self.EPS_END + (self.EPS_START - self.EPS_END) * math.exp(-1. * self.steps_done / self.EPS_DECAY)
 
+        if not self.valid:
+            self.eps_threshold = self.EPS_END + (self.EPS_START - self.EPS_END) * math.exp(-1. * self.steps_done / self.EPS_DECAY)
 
         # Reset the viewbox to its inital position
         self.view_box = ViewBox(image = self.image)
@@ -326,11 +343,13 @@ class EarthObs(Env):
 
             self.grab_vectors.append(fc_layer.detach())
 
-            # Calculate the loss and ~optimize~
-            mig_loss = self.criterion(mig_pred.squeeze(0), self.y_val)
-            optimizer.zero_grad()
-            mig_loss.backward()
-            optimizer.step() 
+            if not self.valid:
+
+                # Calculate the loss and ~optimize~
+                mig_loss = self.criterion(mig_pred.squeeze(0), self.y_val)
+                optimizer.zero_grad()
+                mig_loss.backward()
+                optimizer.step() 
 
             # Save the previous prediction of the LSTM so we can use it to calculate the reward
             prev_pred = self.mig_pred
@@ -348,10 +367,7 @@ class EarthObs(Env):
      
             # If there are no grabs left, update the canvas with this steps results, set the done flag to True & return 
             if self.grabs_left == 0:
-                
-                # with lock:
-                #     print("appending to epoch preds: ", mig_pred.numpy(), epoch_preds)
-                    
+
                 self.draw_elements_on_canvas()
                 done = True
                 return [mig_pred,2,done,4]

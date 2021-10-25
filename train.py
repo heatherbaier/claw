@@ -42,25 +42,4 @@ def train(env, impath, epoch, mini_epochs, shared_model, optimizer, memory, lock
                 env.render()
 
     with lock:
-        epoch_preds.append(mp.item())
-
-
-    # print("Epoch: {}  |  Predicted Migrants: {}".format(epoch, mp.item()))
-
-
-if __name__ == "__main__":
-
-    with open("./migration_data.json", "r") as f:
-        mig_data = json.load(f)
-
-    impath = "./test_ims/484019039.png"
-    muni_id = "484019039"
-    y_val = mig_data[muni_id]
-    memory = ReplayMemory(10000)
-
-    display = True
-    to_tens = transforms.ToTensor()
-
-    env = EarthObs(impath = impath, y_val = y_val, num_channels = 3, num_actions = 5, display = display)
-
-    train(env, 10, display)
+        epoch_preds.append((impath, mp.item()))
