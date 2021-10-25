@@ -154,6 +154,9 @@ class EarthObs(Env):
         # Compute the expected Q values
         expected_state_action_values = (next_state_values * self.GAMMA) + reward_batch
 
+        # print("state_action_values shape: ", state_action_values.shape)
+        # print("expected_state_action_values shape: ", expected_state_action_values.unsqueeze(1).shape)
+        
         # Compute Huber loss
         loss = self.criterion(state_action_values, expected_state_action_values.unsqueeze(1))
 
@@ -317,13 +320,12 @@ class EarthObs(Env):
                 _, mig_pred, fc_layer = shared_model(new_screen, seq = None, select = True)
             else:
                 seq = torch.cat(self.grab_vectors, dim = 1)
-                # print("SEQUENCE SHAPE: ", seq.shape)
                 _, mig_pred, fc_layer = shared_model(new_screen, seq = seq, select = True)
 
             self.grab_vectors.append(fc_layer.detach())
 
             # Calculate the loss and ~optimize~
-            mig_loss = self.criterion(mig_pred, self.y_val)
+            mig_loss = self.criterion(mig_pred.squeeze(0), self.y_val)
             optimizer.zero_grad()
             mig_loss.backward()
             optimizer.step() 
@@ -406,9 +408,9 @@ class EarthObs(Env):
             return [1,reward,done,4]
 
 
-    def update_mig_weights(self, val):
-        mig_loss = self.criterion(val, self.y_val)
-        optimizer.zero_grad()
-        mig_loss.backward()
-        optimizer.step() 
+    # def update_mig_weights(self, val):
+    #     mig_loss = self.criterion(val, self.y_val)
+    #     optimizer.zero_grad()
+    #     mig_loss.backward()
+    #     optimizer.step() 
 
