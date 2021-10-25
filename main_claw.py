@@ -27,18 +27,21 @@ if __name__ == "__main__":
         # Initialize variables
         device = "cpu"
         processes = []
+        epochs = 20
+        mini_epochs = 5
+        batch_criterion = torch.nn.L1Loss()
 
         # Set up shared model and params
         shared_model = DQN(128, 128, n_actions).to(device)
         shared_model.share_memory()
-        optimizer = SharedAdam(shared_model.parameters(), lr = 0.01)
+        optimizer = SharedAdam(shared_model.parameters(), lr = 0.001)
         optimizer.share_memory()
 
         # Set up the Replay Memory as a list that can be shared amongst all threads
         memory = manager.list()
         lock = mp.Lock()
 
-        for epoch in range(0, 5):
+        for epoch in range(0, epochs):
 
             epoch_ys = []
             epoch_preds = manager.list()
@@ -52,7 +55,7 @@ if __name__ == "__main__":
                     epoch_ys.append(obs[1])
 
                     # args = (env, impath, num_epochs, shared ReplayMemory, lock for Replay Memory update, display)
-                    p = mp.Process(target = train, args=(obs[2], obs[0], epoch, shared_model, optimizer, memory, lock, epoch_preds, True, ))
+                    p = mp.Process(target = train, args=(obs[2], obs[0], epoch, mini_epochs, shared_model, optimizer, memory, lock, epoch_preds, True, ))
                     p.start()
                     processes.append(p)
             
@@ -60,10 +63,17 @@ if __name__ == "__main__":
                 for p in processes:
                     p.join()
 
-            print(list(epoch_preds))
-            print(type(list(epoch_preds)[0]))
+            preds = torch.tensor(list(epoch_preds)).view(-1, 1)
+            trues = torch.tensor(epoch_ys).view(-1, 1)
 
-            print("Epoch: ", epoch, "  |  Total Y: ", np.sum(epoch_ys), "  |  Total Predicted Migrants: ", int(np.sum(np.array(list(epoch_preds)))), "  |  Difference: ", np.sum(epoch_ys) - int(np.sum(np.array(list(epoch_preds)))))
+            # print("Preds: ", preds)
+            # print("Trues: ", trues)
+
+            batch_loss = batch_criterion(preds, trues)
+
+            # print(type(list(epoch_preds)[0]))
+
+            print("Epoch: ", epoch, "  |  Loss: ", batch_loss.item())
             
 
 

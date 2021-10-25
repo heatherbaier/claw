@@ -11,29 +11,39 @@ font = cv2.FONT_HERSHEY_COMPLEX_SMALL
 torch.autograd.set_detect_anomaly(True)
 
 
-def train(env, impath, epoch, shared_model, optimizer, memory, lock, epoch_preds, display = True):
+def train(env, impath, epoch, mini_epochs, shared_model, optimizer, memory, lock, epoch_preds, display = True):
 
     to_tens = transforms.ToTensor()
 
     env.reset(epoch = epoch)
     done = False
 
-    while not done:
-        action = env.select_action(shared_model)
-        current_state = env.view_box.clip_image(cv2.imread(impath))
-        mp, reward, done, _ = env.step(action.item(), shared_model, optimizer, epoch_preds, lock)
-        next_state = env.view_box.clip_image(cv2.imread(impath))
-        memory.append((to_tens(current_state).unsqueeze(0), action, to_tens(next_state).unsqueeze(0), torch.tensor([reward])))
-        
-        if done:
+    for mini_epoch in range(mini_epochs):    
+
+        env.reset(epoch = mini_epoch)
+        done = False
+
+        # print("mini_epoch: ", mini_epoch)
+
+        while not done:
+            action = env.select_action(shared_model)
+            current_state = env.view_box.clip_image(cv2.imread(impath))
+            mp, reward, done, _ = env.step(action.item(), shared_model, optimizer, epoch_preds, lock)
+            next_state = env.view_box.clip_image(cv2.imread(impath))
+            memory.append((to_tens(current_state).unsqueeze(0), action, to_tens(next_state).unsqueeze(0), torch.tensor([reward])))
+            
+            # if (done) and (mini_epoch == mini_epochs - 1):
+
+
             with lock:
-                epoch_preds.append(mp.item())
+                env.optimize_model(shared_model, memory, optimizer)
 
-        with lock:
-            env.optimize_model(memory, optimizer)
+            if display:
+                env.render()
 
-        if display:
-            env.render()
+    with lock:
+        epoch_preds.append(mp.item())
+
 
     # print("Epoch: {}  |  Predicted Migrants: {}".format(epoch, mp.item()))
 

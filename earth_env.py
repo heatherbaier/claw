@@ -35,10 +35,9 @@ class ReplayMemory(object):
 n_actions = 5
 device = "cpu"
 
-policy_net = DQN(128, 128, n_actions).to(device)
-target_net = DQN(128, 128, n_actions).to(device)
-target_net.load_state_dict(policy_net.state_dict())
-target_net.eval()
+# policy_net = DQN(128, 128, n_actions).to(device)
+# target_net = DQN(128, 128, n_actions).to(device)
+# target_net.load_state_dict(policy_net.state_dict())
 
 # optimizer = torch.optim.RMSprop(policy_net.parameters())
 # optimizer = torch.optim.Adam(policy_net.parameters(), lr = 0.01)
@@ -92,16 +91,18 @@ class EarthObs(Env):
         self.GAMMA = 0.999
         self.EPS_START = .9
         self.EPS_END = 0.05
-        self.EPS_DECAY = 600
+        self.EPS_DECAY = 200
         self.TARGET_UPDATE = 10
         self.steps_done = 0
         self.total_moves = 0
 
         self.criterion = nn.L1Loss()
 
+        self.target_net = DQN(128, 128, n_actions).to(device)
+        self.target_net.eval()
 
 
-    def optimize_model(self, memory, optimizer, limit = 10000):
+    def optimize_model(self, shared_model, memory, optimizer, limit = 10000):
 
         """
         Function to optimize the policy_net based on saved ReplayMemory
@@ -136,9 +137,8 @@ class EarthObs(Env):
 
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
-        # for each batch state according to policy_net
-
-        pnet_val, _ = policy_net(state_batch)
+        # for each batch state according to shared_model
+        pnet_val, _ = shared_model(state_batch)
 
         state_action_values = pnet_val.gather(1, action_batch)
 
@@ -148,7 +148,7 @@ class EarthObs(Env):
         # This is merged based on the mask, such that we'll have either the expected
         # state value or 0 in case the state was final.
         next_state_values = torch.zeros(self.BATCH_SIZE, device=device)
-        tnet_val, _ = target_net(non_final_next_states)
+        tnet_val, _ = self.target_net(non_final_next_states)
         next_state_values[non_final_mask] = tnet_val.max(1)[0].detach()
         
         # Compute the expected Q values
@@ -183,7 +183,7 @@ class EarthObs(Env):
         sample = random.random()
 
         # Calculate the new epsilon threshold
-        self.eps_threshold = self.EPS_END + (self.EPS_START - self.EPS_END) * math.exp(-1. * self.steps_done / self.EPS_DECAY)
+        # self.eps_threshold = self.EPS_END + (self.EPS_START - self.EPS_END) * math.exp(-1. * self.steps_done / self.EPS_DECAY)
         self.steps_done += 1
 
         # If the random number is larger than eps_threshold, use the trained policy to pick an action
@@ -251,6 +251,8 @@ class EarthObs(Env):
         self.epoch = epoch
         self.grabs_left = self.max_grabs
         self.grab_vectors = []
+        self.eps_threshold = self.EPS_END + (self.EPS_START - self.EPS_END) * math.exp(-1. * self.steps_done / self.EPS_DECAY)
+
 
         # Reset the viewbox to its inital position
         self.view_box = ViewBox(image = self.image)
@@ -406,11 +408,4 @@ class EarthObs(Env):
                 reward = 0
 
             return [1,reward,done,4]
-
-
-    # def update_mig_weights(self, val):
-    #     mig_loss = self.criterion(val, self.y_val)
-    #     optimizer.zero_grad()
-    #     mig_loss.backward()
-    #     optimizer.step() 
 
