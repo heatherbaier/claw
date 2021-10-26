@@ -12,5 +12,3 @@ test.ipynb
 .DS_Store
 dhs.py
 models/
-train_ims/
-val_ims/
