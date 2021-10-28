@@ -1,9 +1,12 @@
 from torchvision import models, transforms
 import torch.multiprocessing as mp
 from copy import deepcopy
+import psutil
+import socket
 import torch
 import json
 import cv2 
+import os
 
 from shared_optim import *
 from dataloader import *
@@ -14,28 +17,30 @@ from train import *
 from utils import *
 from eval import *
 
-font = cv2.FONT_HERSHEY_COMPLEX_SMALL 
+# font = cv2.FONT_HERSHEY_COMPLEX_SMALL 
 torch.autograd.set_detect_anomaly(True)
 
+
+import time
 
 if __name__ == "__main__":
 
     # Set up dataset as batches
-    train_data = Dataset(batch_size = 2, imagery_dir = "train_ims", json_path = "migration_data.json", valid = False, EPS_DECAY = 150)
-    val_data = Dataset(batch_size = 2, imagery_dir = "val_ims", json_path = "migration_data.json", valid = True, EPS_START = 0.05)
+    train_data = Dataset(batch_size = 12, imagery_dir = "/sciclone/home20/hmbaier/claw/train_ims", json_path = "/sciclone/home20/hmbaier/claw/migration_data.json", valid = False, EPS_DECAY = 150)
+    # val_data = Dataset(batch_size = 2, imagery_dir = "/sciclone/home20/hmbaier/claw/val_ims", json_path = "/sciclone/home20/hmbaier/claw/migration_data.json", valid = True, EPS_START = 0.05)
 
-    # print(len(train_data.data))
+    print(len(train_data.data))
     # print(len(val_data.data))
 
 
-    # Using the Manager allows us to share the ReplayMemory list between threads
+    # Using the Manager allows us to share the ReplayMemory list between processes
     with mp.Manager() as manager:
 
         # Initialize variables
         device = "cpu"
         processes = []
         epochs = 20
-        mini_epochs = 2
+        mini_epochs = 20
         batch_criterion = torch.nn.L1Loss()
 
         # Set up shared model and params
@@ -47,6 +52,7 @@ if __name__ == "__main__":
         # Set up the Replay Memory as a list that can be shared amongst all threads
         memory = manager.list()
         lock = mp.Lock()
+        val_preds = manager.list()
 
         for epoch in range(0, epochs):
 
@@ -55,16 +61,17 @@ if __name__ == "__main__":
 
             """ TRAINING DATASET """
 
+            start = time.perf_counter()
+
             # For every list of lists within the dataloader (i.e. for every batch...)
             for batch in train_data.data:
 
                 # For each observation/image in the batch, start a training prcoess for it
-                for obs in batch:
+                for count, (obs) in enumerate(batch):
 
                     epoch_ys.append((obs[0], obs[1]))
 
-                    # args = (env, impath, num_epochs, shared ReplayMemory, lock for Replay Memory update, display)
-                    p = mp.Process(target = train, args=(obs[2], obs[0], epoch, mini_epochs, shared_model, optimizer, memory, lock, epoch_preds, True, ))
+                    p = mp.Process(target = train, args=(obs[2], obs[0], epoch, mini_epochs, shared_model, optimizer, memory, lock, epoch_preds, count, False, ))
                     p.start()
                     processes.append(p)
             
@@ -72,40 +79,11 @@ if __name__ == "__main__":
                 for p in processes:
                     p.join()
 
-            epoch_preds = list(epoch_preds)
-            epoch_preds.sort(key = lambda i: i[0])
-            epoch_ys.sort(key = lambda i: i[0])
+                print("end of batch!")
 
-            epoch_preds = [i[1] for i in epoch_preds]
-            epoch_ys = [i[1] for i in epoch_ys]
+            end = time.perf_counter()
 
-            preds = torch.tensor(epoch_preds).view(-1, 1)
-            trues = torch.tensor(epoch_ys).view(-1, 1)
-
-            training_loss = batch_criterion(preds, trues)
-
-            """ VALIDATION DATASET """
-
-            epoch_ys = []
-            epoch_preds = manager.list()
-
-            for batch in val_data.data:
-
-                # For each observation/image in the batch, start a training prcoess for it
-                for obs in batch:
-
-                    # print(obs[2].EPS_START)
-
-                    epoch_ys.append((obs[0], obs[1]))
-
-                    # args = (env, impath, num_epochs, shared ReplayMemory, lock for Replay Memory update, display)
-                    p = mp.Process(target = validate, args=(obs[2], obs[0], shared_model, lock, epoch_preds, True, ))
-                    p.start()
-                    processes.append(p)
-
-                # Don't let another batch start until the first has finished
-                for p in processes:
-                    p.join()
+            print("Time to finish with WITH mp & join: ", end - start)
 
             epoch_preds = list(epoch_preds)
             epoch_preds.sort(key = lambda i: i[0])
@@ -116,20 +94,18 @@ if __name__ == "__main__":
 
             preds = torch.tensor(epoch_preds).view(-1, 1)
             trues = torch.tensor(epoch_ys).view(-1, 1)
+
+            # print("preds: ", preds, "trues: ", trues)
 
             # print(preds, trues)
 
-            validation_loss = batch_criterion(preds, trues)
+            training_loss = batch_criterion(preds, trues)
+
+            with open("/sciclone/home20/hmbaier/claw/log_v2.txt", "a") as f:
+                f.write("Epoch: " + str(epoch) + "  |  Training Loss: " + str(round(training_loss.item(), 4)) + "\n")
 
 
-            print("Epoch: ", epoch, "  |  Training Loss: ", round(training_loss.item(), 4), "  |  Valdiation Loss: ", round(validation_loss.item(), 4))
 
-
-        # torch.save({
-        #     'epoch': epochs,
-        #     'model_state_dict': shared_model.state_dict(),
-        #     'optimizer_state_dict': optimizer.state_dict(),
-        #     }, "./models/model_v3.torch")
-
+            print("Epoch: ", epoch, "  |  Training Loss: ", round(training_loss.item(), 4))
 
 

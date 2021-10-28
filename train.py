@@ -1,7 +1,10 @@
 from torchvision import models, transforms
+import psutil
+import socket
 import torch
 import json
 import cv2 
+import os
 
 from earth_env import *
 from ViewBox import *
@@ -11,12 +14,16 @@ font = cv2.FONT_HERSHEY_COMPLEX_SMALL
 torch.autograd.set_detect_anomaly(True)
 
 
-def train(env, impath, epoch, mini_epochs, shared_model, optimizer, memory, lock, epoch_preds, display = True):
-
+def train(env, impath, epoch, mini_epochs, shared_model, optimizer, memory, lock, epoch_preds, temp, display = True):
+    
     to_tens = transforms.ToTensor()
 
     env.reset(epoch = epoch)
     done = False
+
+    with open("/sciclone/home20/hmbaier/claw/log_v4.txt", "a") as f:
+        f.write("In training loop on epoch " + str(epoch) + " for temp variable " + str(temp) + "\n")
+
 
     for mini_epoch in range(mini_epochs):    
 
@@ -34,7 +41,6 @@ def train(env, impath, epoch, mini_epochs, shared_model, optimizer, memory, lock
             
             # if (done) and (mini_epoch == mini_epochs - 1):
 
-
             with lock:
                 env.optimize_model(shared_model, memory, optimizer)
 
@@ -42,4 +48,18 @@ def train(env, impath, epoch, mini_epochs, shared_model, optimizer, memory, lock
                 env.render()
 
     with lock:
-        epoch_preds.append((impath, mp.item()))
+        epoch_preds.append((impath, mp.detach()))
+
+
+    with open("/sciclone/home20/hmbaier/claw/log_v4.txt", "a") as f:
+        f.write("MP: " + str(mp.detach()) + "  |  Epoch Preds: " + str(epoch_preds) + "\n")
+
+
+    print("TEMP ID PARALLEL: ", temp)
+    print('parent process:', os.getppid())
+    print('process id:', os.getpid())
+
+
+    # with open("/sciclone/home20/hmbaier/claw/log_inepoch_" + socket.gethostname() + "_" + str(psutil.Process().cpu_num()) + ".txt", "a") as f:
+    #     f.write("Pred: " + str(mp))
+

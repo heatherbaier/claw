@@ -1,6 +1,7 @@
 from torchvision import models, transforms
 from collections import namedtuple, deque
 from ViewBox import *
+import random
 import torch
 import json
 import cv2
@@ -44,13 +45,14 @@ class Dataset():
         self.data = []
         self.to_tens = transforms.ToTensor()
         self.load_data()
+        random.shuffle(self.data)
 
 
     def load_data(self):
 
         count = 0
 
-        for impath in os.listdir(self.imagery_dir):
+        for impath in os.listdir(self.imagery_dir):#[0:32]:
 
             # If have counted up to the amount of a batch, reset all of the lists
             if (count % self.batch_size) == 0:
@@ -65,7 +67,7 @@ class Dataset():
                                       y_val = self.ys[impath.replace(".png", "")], 
                                       num_channels = 3, 
                                       num_actions = 5, 
-                                      display = True, 
+                                      display = False, 
                                       valid = self.valid,
                                       BATCH_SIZE = self.BATCH_SIZE,
                                       GAMMA = self.GAMMA,

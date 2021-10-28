@@ -1,0 +1,19 @@
+#!/bin/tcsh
+#PBS -N nodes2_ppn6
+#PBS -l nodes=2:vortex:ppn=6
+#PBS -l walltime=1:00:00
+
+# init conda within new shell for job
+source "/usr/local/anaconda3-2021.05/etc/profile.d/conda.csh"
+
+module load anaconda3/2021.05
+module load openmpi/3.1.4/gcc-9.3.0
+
+unsetenv PYTHONPATH
+
+conda activate /sciclone/home20/hmbaier/claw/dhsrl
+
+mvp2run -c 1 python /sciclone/home20/hmbaier/claw/main_claw.py
+
+
+

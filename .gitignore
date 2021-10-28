@@ -12,3 +12,14 @@ test.ipynb
 .DS_Store
 dhs.py
 models/
+job_outputs/
+dhsrl
+train_ims
+nodes2*
+
+ex.py
+btest
+tjob
+today/
+yesterday/
+job copy

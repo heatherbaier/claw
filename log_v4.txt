@@ -1,0 +1,12 @@
+In training loop on epoch 0 for temp variable 4
+In training loop on epoch 0 for temp variable 5
+In training loop on epoch 0 for temp variable 2
+In training loop on epoch 0 for temp variable 7
+In training loop on epoch 0 for temp variable 0
+In training loop on epoch 0 for temp variable 11
+In training loop on epoch 0 for temp variable 10
+In training loop on epoch 0 for temp variable 6
+In training loop on epoch 0 for temp variable 9
+In training loop on epoch 0 for temp variable 3
+In training loop on epoch 0 for temp variable 1
+In training loop on epoch 0 for temp variable 8

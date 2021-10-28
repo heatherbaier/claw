@@ -384,7 +384,7 @@ class EarthObs(Env):
                 
                 self.first_grab = False
 
-                return [1,2,done,4]
+                return [mig_pred,2,done,4]
                 
 
         # If the action is just a simple move...

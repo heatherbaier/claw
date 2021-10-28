@@ -1,0 +1,22 @@
+#!/bin/tcsh
+#PBS -N asg:mpi4py
+#PBS -l nodes=1:vortex:ppn=12
+#PBS -l walltime=1:00:00
+#PBS -j oe
+
+# init conda within new shell for job
+source "/usr/local/anaconda3-2021.05/etc/profile.d/conda.csh"
+
+
+module load anaconda3/2021.05
+module load openmpi/3.1.4/gcc-9.3.0
+
+unsetenv PYTHONPATH
+
+conda activate base
+
+conda deactivate
+
+conda create --prefix /sciclone/home20/hmbaier/claw/dhsrl -y
+
+pip install torchvision torch opencv-python gym

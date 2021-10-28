@@ -1,0 +1,17 @@
+#!/bin/tcsh
+#PBS -N buildPyEnv
+#PBS -l nodes=1:bora:ppn=1
+#PBS -l walltime=1:00:00
+#PBS -j oe
+
+# init conda within new shell for job
+source "/usr/local/anaconda3-2020.02/etc/profile.d/conda.csh"
+
+
+module load anaconda3/2020.02
+
+unsetenv PYTHONPATH
+
+conda activate /sciclone/home20/hmbaier/claw/dhsrl
+
+pip install --upgrade pandas

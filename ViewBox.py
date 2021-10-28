@@ -4,10 +4,10 @@ import cv2
 
 from models import *
 
-font = cv2.FONT_HERSHEY_COMPLEX_SMALL 
+# font = cv2.FONT_HERSHEY_COMPLEX_SMALL 
 torch.autograd.set_detect_anomaly(True)
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 
 class ViewBox(object):
