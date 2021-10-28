@@ -1,6 +1,6 @@
 #!/bin/tcsh
 #PBS -N nodes2_ppn6
-#PBS -l nodes=2:vortex:ppn=6
+#PBS -l nodes=2:vortex:ppn=12
 #PBS -l walltime=1:00:00
 
 # init conda within new shell for job

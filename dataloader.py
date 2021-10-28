@@ -52,7 +52,7 @@ class Dataset():
 
         count = 0
 
-        for impath in os.listdir(self.imagery_dir):#[0:32]:
+        for impath in os.listdir(self.imagery_dir)[0:12]:
 
             # If have counted up to the amount of a batch, reset all of the lists
             if (count % self.batch_size) == 0:
@@ -64,6 +64,7 @@ class Dataset():
             cur_data.append((os.path.join(self.imagery_dir, impath), 
                              self.ys[impath.replace(".png", "")], 
                              EarthObs(impath = os.path.join(self.imagery_dir, impath), 
+                                      im = im,
                                       y_val = self.ys[impath.replace(".png", "")], 
                                       num_channels = 3, 
                                       num_actions = 5, 

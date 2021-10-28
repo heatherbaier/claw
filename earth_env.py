@@ -50,6 +50,7 @@ class EarthObs(Env):
 
     def __init__(self, 
                 impath, 
+                im,
                 y_val, 
                 num_channels, 
                 num_actions, 
@@ -71,7 +72,7 @@ class EarthObs(Env):
 
         # init the image data and canvas
         self.impath = impath
-        self.image = cv2.imread(self.impath)
+        self.image = im
         self.canvas = self.image
 
         # Define a 3D observation space
@@ -223,23 +224,29 @@ class EarthObs(Env):
         Function to draw all the Landsat info and the current model status information on the screen
         """
 
-        # Sert up the canvas with the initial Landsat image
-        self.canvas = cv2.imread(self.impath)
+        if self.display:
 
-        # If the action was a select, the box will draw as green, otherwise it'll draw as red
-        if red:
-            self.canvas = cv2.rectangle(self.canvas, self.view_box.start_point, self.view_box.end_point, self.view_box.color, self.view_box.thickness)        
+            # Sert up the canvas with the initial Landsat image
+            self.canvas = cv2.imread(self.impath)
+
+            # If the action was a select, the box will draw as green, otherwise it'll draw as red
+            if red:
+                self.canvas = cv2.rectangle(self.canvas, self.view_box.start_point, self.view_box.end_point, self.view_box.color, self.view_box.thickness)        
+            else:
+                self.canvas = cv2.rectangle(self.canvas, self.view_box.start_point, self.view_box.end_point, (0,255,0), self.view_box.thickness)        
+
+            # Set up a list of text variables and their screen locations
+            text = ["Epoch: {}".format(self.epoch), 'Grabs Left: {}'.format(self.grabs_left), "Current Prediction: {} migrants".format(int(self.mig_pred)), "Current Error: {} migrants".format(int(self.error)), "Epsilon: {}".format(round(self.eps_threshold, 2)), "Land Cover %: {}".format(0)]
+            locs = [(50,50), (50,90), (50,130), (50,170), (50,210)]
+
+            # Then interate over the lists and put the information on the canvas
+            for i in zip(text, locs):
+                self.canvas = cv2.putText(self.canvas, i[0], i[1], font,  
+                        1.2, (255, 255, 255), 1, cv2.LINE_AA)
+
         else:
-            self.canvas = cv2.rectangle(self.canvas, self.view_box.start_point, self.view_box.end_point, (0,255,0), self.view_box.thickness)        
 
-        # Set up a list of text variables and their screen locations
-        text = ["Epoch: {}".format(self.epoch), 'Grabs Left: {}'.format(self.grabs_left), "Current Prediction: {} migrants".format(int(self.mig_pred)), "Current Error: {} migrants".format(int(self.error)), "Epsilon: {}".format(round(self.eps_threshold, 2)), "Land Cover %: {}".format(0)]
-        locs = [(50,50), (50,90), (50,130), (50,170), (50,210)]
-
-        # Then interate over the lists and put the information on the canvas
-        for i in zip(text, locs):
-            self.canvas = cv2.putText(self.canvas, i[0], i[1], font,  
-                    1.2, (255, 255, 255), 1, cv2.LINE_AA)
+            pass
 
     def reset(self, epoch):
 
@@ -273,6 +280,8 @@ class EarthObs(Env):
 
         # Reset the viewbox to its inital position
         self.view_box = ViewBox(image = self.image)
+
+        # if self.display:
 
         # Reset the canvas to the Landsat image
         self.canvas = cv2.imread(self.impath)
@@ -362,12 +371,15 @@ class EarthObs(Env):
             # De-tensorize (lol words)
             self.mig_pred = mig_pred.item()
 
+            # if self.display:
+
             # Update the canvas, but draw the box as green since it was a select
             self.draw_elements_on_canvas(red = False)
      
             # If there are no grabs left, update the canvas with this steps results, set the done flag to True & return 
             if self.grabs_left == 0:
 
+                # if self.display:
                 self.draw_elements_on_canvas()
                 done = True
                 return [mig_pred,2,done,4]
@@ -404,6 +416,8 @@ class EarthObs(Env):
             
             # Now take the action and update the view_boxes position (and therefore our state)
             self.view_box.move_box(action)
+
+            # if self.display:
 
             # Draw pretty
             self.draw_elements_on_canvas()

@@ -26,7 +26,7 @@ import time
 if __name__ == "__main__":
 
     # Set up dataset as batches
-    train_data = Dataset(batch_size = 12, imagery_dir = "/sciclone/home20/hmbaier/claw/train_ims", json_path = "/sciclone/home20/hmbaier/claw/migration_data.json", valid = False, EPS_DECAY = 150)
+    train_data = Dataset(batch_size = 12, imagery_dir = "/sciclone/geograd/Heather/mex_imagery/", json_path = "/sciclone/home20/hmbaier/claw/migration_data.json", valid = False, EPS_DECAY = 150)
     # val_data = Dataset(batch_size = 2, imagery_dir = "/sciclone/home20/hmbaier/claw/val_ims", json_path = "/sciclone/home20/hmbaier/claw/migration_data.json", valid = True, EPS_START = 0.05)
 
     print(len(train_data.data))
@@ -40,7 +40,7 @@ if __name__ == "__main__":
         device = "cpu"
         processes = []
         epochs = 20
-        mini_epochs = 20
+        mini_epochs = 5
         batch_criterion = torch.nn.L1Loss()
 
         # Set up shared model and params
@@ -101,7 +101,7 @@ if __name__ == "__main__":
 
             training_loss = batch_criterion(preds, trues)
 
-            with open("/sciclone/home20/hmbaier/claw/log_v2.txt", "a") as f:
+            with open("/sciclone/home20/hmbaier/claw/log_v5.txt", "a") as f:
                 f.write("Epoch: " + str(epoch) + "  |  Training Loss: " + str(round(training_loss.item(), 4)) + "\n")
 
 
